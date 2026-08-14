@@ -2,8 +2,16 @@ name: CI
 
 on:
   pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review]
   push:
     branches: [main]
+  merge_group:
+    types: [checks_requested]
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -14,11 +22,43 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: web/package-lock.json
+      - name: Verify DCO sign-offs
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        shell: bash
+        run: |
+          merge_base="$(git merge-base "$BASE_SHA" "$HEAD_SHA")"
+          failures=0
+          while IFS= read -r commit; do
+            author="$(git show -s --format='%an <%ae>' "$commit")"
+            if ! git show -s --format='%(trailers:key=Signed-off-by,valueonly)' "$commit" \
+              | grep -Fxiq -- "$author"; then
+              printf 'Missing matching Signed-off-by trailer: %s (%s)\n' "$commit" "$author"
+              failures=$((failures + 1))
+            fi
+          done < <(git rev-list --no-merges "$merge_base..$HEAD_SHA")
+          test "$failures" -eq 0
+      - name: Check pull request diff
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: git diff --check "$BASE_SHA...$HEAD_SHA"
+      - name: Check pushed commit
+        if: github.event_name != 'pull_request'
+        run: git show --check --format= "$GITHUB_SHA"
+      - name: Validate deployment Compose
+        run: docker compose -f deploy/compose.yml config --quiet
       - name: Install dependencies
         working-directory: web
         run: npm ci
@@ -31,18 +71,33 @@ jobs:
       - name: Static checks
         working-directory: web
         run: npm run check
+      - name: Production build
+        working-directory: web
+        run: npm run build
       - name: Install Playwright Chromium
         working-directory: web
         run: npx playwright install --with-deps chromium
       - name: End-to-end tests
         working-directory: web
         run: npm run test:e2e
+      - name: Upload Playwright failure report
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            web/playwright-report
+            web/test-results
+          if-no-files-found: ignore
+          retention-days: 7
 
   agent-control:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24

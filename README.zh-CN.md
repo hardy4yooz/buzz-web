@@ -2,6 +2,8 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
+[![CI](https://github.com/hardy4yooz/buzz-web/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/hardy4yooz/buzz-web/actions/workflows/ci.yml)
+
 Buzz Web 是一个连接 [Buzz](https://github.com/block/buzz) Relay 的独立浏览器客户端。它
 不打包、也不修改 Relay，即可在现代浏览器中提供频道、私聊、线程、Reaction、搜索、
 媒体、Inbox、邀请、远程 Agent、在线状态和 NIP-34 仓库浏览等核心协作能力。
