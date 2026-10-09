@@ -1,11 +1,16 @@
 import { PanelResizeHandle, usePersistedPanelWidth } from "@/shared/ui/resizable-panel";
 
-type RightPanelKind = "agent" | "channel" | "thread";
+type RightPanelKind = "activity" | "agent" | "channel" | "thread";
 
 const PANEL_SPECS: Record<
   RightPanelKind,
   { defaultWidth: number; minimumWidth: number; storageKey: string }
 > = {
+  activity: {
+    defaultWidth: 420,
+    minimumWidth: 320,
+    storageKey: "buzz-web-activity-panel-width-v1",
+  },
   agent: {
     defaultWidth: 360,
     minimumWidth: 320,

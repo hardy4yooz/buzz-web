@@ -44,15 +44,13 @@ export function inboxLiveFilters(
   channelIds: readonly string[],
   since: number,
 ): NostrFilter[] {
-  return [
+  const filters: NostrFilter[] = [
     { kinds: INBOX_EVENT_KINDS, "#p": [currentPubkey], since, limit: 0 },
-    ...channelIds.map((channelId) => ({
-      kinds: INBOX_EVENT_KINDS,
-      "#h": [channelId],
-      since,
-      limit: 0,
-    })),
   ];
+  if (channelIds.length) {
+    filters.push({ kinds: INBOX_EVENT_KINDS, "#h": [...channelIds], since, limit: 0 });
+  }
+  return filters;
 }
 
 function legacyReadStateKey(relayUrl: string, pubkey: string): string {

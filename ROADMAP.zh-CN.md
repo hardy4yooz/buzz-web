@@ -57,6 +57,10 @@ Relay 已读状态同步。
 
 ### 远程 Agent 运维
 
+> **状态：** Web 端现已支持由 Owner 加密、按频道隔离的 Agent 实时观察活动，并仅在内存中
+> 有界保留；参见 [Agent 实时观察活动](docs/agent-observer-activity.zh-CN.md)。持久历史和经过
+> 认证的控制面操作仍在计划中。
+
 **目标：** 通过有认证的控制面提供远程 Agent 配置、日志、Session、Memory、Persona、
 Team、响应策略和生命周期状态。
 

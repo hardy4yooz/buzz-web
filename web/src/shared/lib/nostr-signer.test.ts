@@ -1,10 +1,14 @@
 import { nsecEncode } from "nostr-tools/nip19";
-import { generateSecretKey, verifyEvent } from "nostr-tools/pure";
-import { afterEach, describe, expect, it } from "vitest";
+import { getConversationKey, encrypt as nip44Encrypt } from "nostr-tools/nip44";
+import { generateSecretKey, getPublicKey, verifyEvent } from "nostr-tools/pure";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   activateLocalSigner,
+  activateNip07Signer,
+  canDecryptNip44FromPeer,
   clearActiveSigner,
   createIdentityBackup,
+  decryptNip44FromPeer,
   parseSecretKey,
   restoreIdentityBackup,
   signNostrEvent,
@@ -44,4 +48,38 @@ describe("browser Nostr signer", () => {
       restored.fill(0);
     }
   }, 30_000);
+
+  it("decrypts agent-to-owner NIP-44 content with an imported local signer", async () => {
+    const ownerSecret = generateSecretKey();
+    const agentSecret = generateSecretKey();
+    const ownerPubkey = activateLocalSigner(ownerSecret);
+    const agentPubkey = getPublicKey(agentSecret);
+    const conversationKey = getConversationKey(agentSecret, ownerPubkey);
+    const ciphertext = nip44Encrypt(JSON.stringify({ kind: "working" }), conversationKey);
+    conversationKey.fill(0);
+    try {
+      expect(canDecryptNip44FromPeer()).toBe(true);
+      await expect(decryptNip44FromPeer(agentPubkey, ciphertext)).resolves.toBe(
+        JSON.stringify({ kind: "working" }),
+      );
+    } finally {
+      ownerSecret.fill(0);
+      agentSecret.fill(0);
+    }
+  });
+
+  it("routes peer decryption through NIP-07 when the extension provides NIP-44", async () => {
+    const decrypt = vi.fn().mockResolvedValue("decrypted");
+    vi.stubGlobal("window", {
+      nostr: {
+        getPublicKey: vi.fn().mockResolvedValue("11".repeat(32)),
+        signEvent: vi.fn(),
+        nip44: { decrypt, encrypt: vi.fn() },
+      },
+    });
+    await activateNip07Signer();
+    await expect(decryptNip44FromPeer("22".repeat(32), "ciphertext")).resolves.toBe("decrypted");
+    expect(decrypt).toHaveBeenCalledWith("22".repeat(32), "ciphertext");
+    vi.unstubAllGlobals();
+  });
 });

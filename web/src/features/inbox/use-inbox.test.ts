@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { INBOX_EVENT_KINDS } from "@/features/inbox/lib/inbox-model";
 import {
   eventReadFrontier,
   inboxLiveFilters,
@@ -71,12 +72,18 @@ describe("Inbox event refresh", () => {
 });
 
 describe("Inbox live subscriptions", () => {
-  it("uses one channel-scoped subscription per channel for Relay fan-out", () => {
+  it("combines channel IDs into one #h filter while keeping #p as a separate OR filter", () => {
     const filters = inboxLiveFilters("f".repeat(64), ["channel-a", "channel-b"], 42);
 
-    expect(filters.filter((filter) => filter["#h"]).map((filter) => filter["#h"])).toEqual([
-      ["channel-a"],
-      ["channel-b"],
+    expect(filters).toEqual([
+      { kinds: INBOX_EVENT_KINDS, "#p": ["f".repeat(64)], since: 42, limit: 0 },
+      { kinds: INBOX_EVENT_KINDS, "#h": ["channel-a", "channel-b"], since: 42, limit: 0 },
+    ]);
+  });
+
+  it("keeps the direct-mention filter when there are no channels", () => {
+    expect(inboxLiveFilters("f".repeat(64), [], 42)).toEqual([
+      { kinds: INBOX_EVENT_KINDS, "#p": ["f".repeat(64)], since: 42, limit: 0 },
     ]);
   });
 });

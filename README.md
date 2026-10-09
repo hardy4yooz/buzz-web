@@ -2,6 +2,8 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
+[![CI](https://github.com/hardy4yooz/buzz-web/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/hardy4yooz/buzz-web/actions/workflows/ci.yml)
+
 Buzz Web is a standalone browser client for a [Buzz](https://github.com/block/buzz) Relay. It
 brings the core collaboration experience to any modern browser without bundling or modifying the
 Relay: channels, direct messages, threads, reactions, search, media, Inbox, invitations, remote

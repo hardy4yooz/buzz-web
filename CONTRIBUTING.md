@@ -55,6 +55,7 @@ cd web
 npm run typecheck
 npm test
 npm run check
+npm run build
 npm run test:e2e
 
 cd ../agent-control
@@ -66,6 +67,24 @@ git diff --check
 
 Run `docker compose -f deploy/compose.yml config` when changing deployment files. If a check cannot
 run in your environment, state that clearly in the pull request.
+
+## Automated Pull Request Checks
+
+Every pull request runs two required, read-only GitHub Actions checks:
+
+- `web` verifies every non-merge commit's DCO sign-off, checks the diff and deployment Compose,
+  then runs the Web typecheck, unit tests, static checks, production build, and demo Playwright
+  suite.
+- `agent-control` installs its locked dependencies and runs its unit tests.
+
+GitHub requires a maintainer to approve Actions for a contributor's first pull request from a
+fork. Later pushes cancel older in-progress runs. A failed Playwright run retains its report and
+test artifacts for seven days from the workflow run page.
+
+Fork pull requests receive no Relay identity, deployment, model-provider, or Agent credentials.
+Live Relay acceptance remains a maintainer-run check and is never part of untrusted pull request
+CI. Automated checks validate the contribution but do not constitute protocol or security design
+approval.
 
 ## Security Reports
 

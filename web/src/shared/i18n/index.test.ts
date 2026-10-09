@@ -18,4 +18,12 @@ describe("resolveLocale", () => {
     vi.stubGlobal("navigator", { language: "zh-CN", languages: ["zh-CN"] });
     expect(t("error.attachmentImagePrepare")).toBe("无法处理此图片以上传。");
   });
+
+  it("localizes the agent activity panel in English and Chinese", () => {
+    vi.stubGlobal("navigator", { language: "en-US", languages: ["en-US"] });
+    expect(t("activity.panelTitle")).toBe("Agent activity");
+    vi.stubGlobal("navigator", { language: "zh-CN", languages: ["zh-CN"] });
+    expect(t("activity.panelTitle")).toBe("Agent 活动");
+    expect(t("activity.view")).toBe("查看活动");
+  });
 });
