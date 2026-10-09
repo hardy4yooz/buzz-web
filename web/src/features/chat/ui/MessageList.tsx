@@ -310,10 +310,12 @@ export function MessageRow({
             <p className="text-sm italic text-muted-foreground">{t("message.deleted")}</p>
           ) : (
             <MessageContent
+              canDeleteMessage={(ownMessage || canModerate) && Boolean(onDelete)}
               content={message.content}
               mediaTags={message.event.tags}
               mentions={mentions}
               relayUrl={relayUrl}
+              onDeleteMessage={() => onDelete?.(message)}
             />
           )}
         </div>

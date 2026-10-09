@@ -4,6 +4,7 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import remarkMentions from "@/features/chat/lib/remark-mentions";
+import { ImageAttachmentViewer } from "@/features/chat/ui/ImageAttachmentViewer";
 import { authenticatedMediaObjectUrl } from "@/shared/api/media-client";
 import { relayHttpOrigin } from "@/shared/config/runtime-config";
 import { t } from "@/shared/i18n";
@@ -23,6 +24,7 @@ export type MessageMention = {
 type MarkdownRenderContextValue = {
   dimensionsByUrl: ReadonlyMap<string, ImageDimensions>;
   mentionsByName: ReadonlyMap<string, MessageMention>;
+  onDeleteMessage?: () => void;
   relayUrl: string;
 };
 
@@ -73,14 +75,17 @@ function ProtectedImage({
   alt,
   relayUrl,
   dimensions,
+  onDeleteMessage,
 }: {
   src?: string;
   alt?: string;
   relayUrl: string;
   dimensions?: ImageDimensions;
+  onDeleteMessage?: () => void;
 }) {
   const [resolved, setResolved] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
   useEffect(() => {
     let cancelled = false;
     setFailed(false);
@@ -121,15 +126,34 @@ function ProtectedImage({
       ) : !resolved ? (
         <LoaderCircle className="h-4 w-4 animate-spin text-muted-foreground" />
       ) : (
-        <img
-          alt={alt || t("message.attachmentImage")}
-          className="block h-full w-full object-contain"
-          decoding="async"
-          height={intrinsic.height}
-          loading="lazy"
-          src={resolved}
-          width={intrinsic.width}
-        />
+        <>
+          <button
+            aria-label={t("message.expandImage", { name: alt || t("message.attachmentImage") })}
+            className="block h-full w-full cursor-zoom-in"
+            title={t("message.expandImage", { name: alt || t("message.attachmentImage") })}
+            type="button"
+            onClick={() => setViewerOpen(true)}
+          >
+            <img
+              alt={alt || t("message.attachmentImage")}
+              className="block h-full w-full object-contain"
+              decoding="async"
+              height={intrinsic.height}
+              loading="lazy"
+              src={resolved}
+              width={intrinsic.width}
+            />
+          </button>
+          {viewerOpen ? (
+            <ImageAttachmentViewer
+              alt={alt || t("message.attachmentImage")}
+              resolvedUrl={resolved}
+              sourceUrl={new URL(src ?? resolved, relayHttpOrigin(relayUrl)).toString()}
+              onClose={() => setViewerOpen(false)}
+              onDeleteMessage={onDeleteMessage}
+            />
+          ) : null}
+        </>
       )}
     </span>
   );
@@ -180,13 +204,14 @@ function ProtectedLink({
 }
 
 const MarkdownImage: NonNullable<Components["img"]> = ({ src, alt }) => {
-  const { dimensionsByUrl, relayUrl } = useMarkdownRenderContext();
+  const { dimensionsByUrl, onDeleteMessage, relayUrl } = useMarkdownRenderContext();
   return (
     <ProtectedImage
       src={src}
       alt={alt}
       dimensions={src ? dimensionsByUrl.get(src) : undefined}
       relayUrl={relayUrl}
+      onDeleteMessage={onDeleteMessage}
     />
   );
 };
@@ -245,11 +270,15 @@ export function MessageContent({
   relayUrl,
   mentions = [],
   mediaTags,
+  canDeleteMessage = false,
+  onDeleteMessage,
 }: {
   content: string;
   relayUrl: string;
   mentions?: readonly MessageMention[];
   mediaTags?: readonly (readonly string[])[];
+  canDeleteMessage?: boolean;
+  onDeleteMessage?: () => void;
 }) {
   const mentionsByName = new Map(
     mentions.map((mention) => [mention.name.trim().toLocaleLowerCase(), mention]),
@@ -258,7 +287,14 @@ export function MessageContent({
   const dimensionsByUrl = imetaImageDimensions(mediaTags);
 
   return (
-    <MarkdownRenderContext.Provider value={{ dimensionsByUrl, mentionsByName, relayUrl }}>
+    <MarkdownRenderContext.Provider
+      value={{
+        dimensionsByUrl,
+        mentionsByName,
+        onDeleteMessage: canDeleteMessage ? onDeleteMessage : undefined,
+        relayUrl,
+      }}
+    >
       <div className="buzz-message-markdown">
         <ReactMarkdown
           remarkPlugins={[remarkGfm, remarkBreaks, [remarkMentions, { mentionNames }]]}

@@ -498,6 +498,55 @@ test("message images keep their reserved layout while loading", async ({ page })
   await expectNoViewportOverflow(page);
 });
 
+test("message images expand with save, share, copy-link, and delete actions", async ({ page }) => {
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await enableDemo(page);
+  await page.goto("/");
+  await page.evaluate(() => {
+    const state = window as typeof window & { sharedImageFiles?: number };
+    Object.defineProperty(navigator, "canShare", {
+      configurable: true,
+      value: (data: ShareData) => Boolean(data.files?.length),
+    });
+    Object.defineProperty(navigator, "share", {
+      configurable: true,
+      value: async (data: ShareData) => {
+        state.sharedImageFiles = data.files?.length ?? 0;
+      },
+    });
+  });
+
+  const imageUrl = new URL("/app-icon.png", page.url()).toString();
+  const composer = page.getByLabel("Send a message to #general");
+  await composer.fill(`![generated-chart](${imageUrl})`);
+  await composer.press("Enter");
+
+  await page.getByRole("button", { name: "Expand image: generated-chart" }).click();
+  const viewer = page.getByRole("dialog", { name: "Image viewer" });
+  await expect(viewer).toBeVisible();
+  await expect(viewer.getByRole("img", { name: "generated-chart" })).toBeVisible();
+  await expect(viewer.getByRole("button", { name: "Save image" })).toBeVisible();
+  await expect(viewer.getByRole("button", { name: "Share image" })).toBeVisible();
+  await expect(viewer.getByRole("button", { name: "Copy image link" })).toBeVisible();
+  await expect(viewer.getByRole("button", { name: "Delete message" })).toBeVisible();
+
+  const downloadPromise = page.waitForEvent("download");
+  await viewer.getByRole("button", { name: "Save image" }).click();
+  expect((await downloadPromise).suggestedFilename()).toBe("generated-chart.png");
+
+  await viewer.getByRole("button", { name: "Share image" }).click();
+  await expect.poll(() => page.evaluate(() => window.sharedImageFiles)).toBe(1);
+
+  await viewer.getByRole("button", { name: "Copy image link" }).click();
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(imageUrl);
+
+  await viewer.getByRole("button", { name: "Delete message" }).click();
+  const deleteDialog = page.getByRole("dialog", { name: "Delete message" });
+  await expect(deleteDialog).toBeVisible();
+  await deleteDialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(deleteDialog).toBeHidden();
+});
+
 test("thread replies can target a specific message", async ({ page }) => {
   await enableDemo(page);
   await page.goto("/");
