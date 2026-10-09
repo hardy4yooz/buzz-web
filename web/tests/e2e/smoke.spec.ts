@@ -122,6 +122,37 @@ test("desktop navigation opens a remote-agent DM", async ({ page }) => {
   await expect(page.getByLabel("Send a message to Codex(remote)")).toBeVisible();
 });
 
+test("agent activity exposes a redacted fixture view at desktop and mobile widths", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await enableDemo(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Codex(remote)", exact: true }).click();
+  await page.getByLabel("Send a message to Codex(remote)").fill("Run the fixture verification.");
+  await page.getByRole("button", { name: "Send" }).click();
+
+  const indicator = page.getByTestId("agent-activity-indicator");
+  await expect(indicator).toContainText("Using a tool — npm test -- --runInBand");
+  await indicator.getByRole("button", { name: "View activity" }).click();
+
+  const panel = page.getByRole("complementary", { name: "Agent activity" });
+  await expect(panel.getByText("npm test -- --runInBand", { exact: true })).toBeVisible();
+  await expect(panel).not.toContainText("rawInput");
+
+  await page.screenshot({
+    path: "test-results/visual/agent-activity-desktop.png",
+    animations: "disabled",
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(panel).toBeVisible();
+  await expectNoViewportOverflow(page);
+  await page.screenshot({
+    path: "test-results/visual/agent-activity-mobile.png",
+    animations: "disabled",
+  });
+});
+
 test("new direct message uses the workspace To picker", async ({ page }) => {
   await enableDemo(page);
   await page.goto("/");
@@ -923,6 +954,31 @@ test("Chinese browsers receive the Chinese interface", async ({ browser }) => {
   await expect(page.getByRole("heading", { name: "你受邀加入" })).toBeVisible();
   await expect(page.getByRole("link", { name: "立即下载" })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
+  await context.close();
+});
+
+test("agent activity is localized in Chinese", async ({ browser }) => {
+  const context = await browser.newContext({
+    locale: "zh-CN",
+    viewport: { width: 1280, height: 800 },
+  });
+  const page = await context.newPage();
+  await enableDemo(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Codex(remote)", exact: true }).click();
+  await page.getByLabel("发送消息到 Codex(remote)").fill("运行合成验证。");
+  await page.getByRole("button", { name: "发送消息" }).click();
+
+  const indicator = page.getByTestId("agent-activity-indicator");
+  await expect(indicator).toContainText("使用工具");
+  await indicator.getByRole("button", { name: "查看活动" }).click();
+  await expect(page.getByRole("complementary", { name: "Agent 活动" })).toContainText(
+    "npm test -- --runInBand",
+  );
+  await page.screenshot({
+    path: "test-results/visual/agent-activity-desktop-zh.png",
+    animations: "disabled",
+  });
   await context.close();
 });
 

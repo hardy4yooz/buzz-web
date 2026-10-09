@@ -14,6 +14,9 @@ import { signNostrEvent } from "@/shared/lib/nostr-signer";
 type Subscription = {
   filter: NostrFilter;
   onEvent: (event: NostrEvent) => void;
+  onClosed?: (error: Error) => void;
+  onEose?: () => void;
+  onRetry?: () => void;
   persistent: boolean;
   events?: NostrEvent[];
   resolve?: (events: NostrEvent[]) => void;
@@ -198,10 +201,18 @@ export class BuzzRelayClient {
     return (await response.json()) as NostrEvent[];
   }
 
-  async subscribe(filter: NostrFilter, onEvent: (event: NostrEvent) => void): Promise<() => void> {
+  async subscribe(
+    filter: NostrFilter,
+    onEvent: (event: NostrEvent) => void,
+    lifecycle: {
+      onClosed?: (error: Error) => void;
+      onEose?: () => void;
+      onRetry?: () => void;
+    } = {},
+  ): Promise<() => void> {
     await this.connect();
     const id = `live-${crypto.randomUUID()}`;
-    this.subscriptions.set(id, { filter, onEvent, persistent: true });
+    this.subscriptions.set(id, { filter, onEvent, persistent: true, ...lifecycle });
     this.send(["REQ", id, filter]);
     return () => {
       const subscription = this.subscriptions.get(id);
@@ -275,7 +286,11 @@ export class BuzzRelayClient {
     }
     if (type === "EOSE" && typeof data[1] === "string") {
       const subscription = this.subscriptions.get(data[1]);
-      if (!subscription || subscription.persistent) return;
+      if (!subscription) return;
+      if (subscription.persistent) {
+        subscription.onEose?.();
+        return;
+      }
       const events = subscription.events ?? [];
       subscription.resolve?.(events);
       this.clearSubscription(data[1], subscription);
@@ -287,11 +302,13 @@ export class BuzzRelayClient {
       const message = typeof data[2] === "string" ? data[2] : "";
       const retryDelay = rateLimitRetryDelay(message);
       if (retryDelay !== null) {
+        subscription.onRetry?.();
         this.scheduleSubscriptionRetry(data[1], subscription, retryDelay);
         return;
       }
       const error = new Error(message || t("error.relaySubscriptionClosed"));
       subscription.reject?.(error);
+      subscription.onClosed?.(error);
       this.clearSubscription(data[1], subscription);
     }
   }

@@ -62,6 +62,10 @@ switching.
 
 ### Remote agent operations
 
+> **Status:** Web now supports owner-encrypted, channel-scoped live observer activity with bounded
+> in-memory retention; see [Live Agent Observer Activity](docs/agent-observer-activity.md).
+> Persistent history and authenticated control-plane operations remain planned.
+
 **Target:** expose remote agent configuration, logs, sessions, memory, persona/team membership,
 response policy, and lifecycle state through an authenticated control-plane contract.
 
