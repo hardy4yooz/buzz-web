@@ -118,6 +118,13 @@ export function canEncryptToSelf(): boolean {
   return activeMode === "nip07" && window.nostr?.nip44 != null && activePubkey !== null;
 }
 
+/** Whether the active signer can decrypt agent-to-owner NIP-44 frames. */
+export function canDecryptNip44FromPeer(): boolean {
+  if (!activePubkey) return false;
+  if (activeMode === "local") return activeSecretKey !== null;
+  return activeMode === "nip07" && window.nostr?.nip44 != null;
+}
+
 export async function encryptNip44ToSelf(plaintext: string): Promise<string> {
   if (!activePubkey) throw new Error(t("error.signerLocked"));
   if (activeMode === "nip07") {
@@ -143,6 +150,29 @@ export async function decryptNip44FromSelf(ciphertext: string): Promise<string> 
   }
   if (activeMode === "local" && activeSecretKey) {
     const conversationKey = getConversationKey(activeSecretKey, activePubkey);
+    try {
+      return nip44Decrypt(ciphertext, conversationKey);
+    } finally {
+      conversationKey.fill(0);
+    }
+  }
+  throw new Error(t("error.signerLocked"));
+}
+
+/** Decrypt NIP-44 content sent by a peer to the active owner identity. */
+export async function decryptNip44FromPeer(
+  peerPubkey: string,
+  ciphertext: string,
+): Promise<string> {
+  if (!activePubkey) throw new Error(t("error.signerLocked"));
+  const normalizedPeer = peerPubkey.trim().toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(normalizedPeer)) throw new Error(t("error.pubkeyInvalid"));
+  if (activeMode === "nip07") {
+    if (!window.nostr?.nip44) throw new Error(t("error.nip44Unavailable"));
+    return window.nostr.nip44.decrypt(normalizedPeer, ciphertext);
+  }
+  if (activeMode === "local" && activeSecretKey) {
+    const conversationKey = getConversationKey(activeSecretKey, normalizedPeer);
     try {
       return nip44Decrypt(ciphertext, conversationKey);
     } finally {

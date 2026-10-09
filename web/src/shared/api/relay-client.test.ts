@@ -234,6 +234,31 @@ describe("BuzzRelayClient rate limits", () => {
     client.disconnect();
   });
 
+  it("reports persistent subscription readiness, retry, and terminal closure", async () => {
+    const client = new BuzzRelayClient("wss://relay.example");
+    const socket = await connectClient(client);
+    const onEose = vi.fn();
+    const onRetry = vi.fn();
+    const onClosed = vi.fn();
+    await client.subscribe({ kinds: [24200], limit: 0 }, vi.fn(), {
+      onClosed,
+      onEose,
+      onRetry,
+    });
+    const subscriptionId = lastSent(socket)[1];
+
+    socket.receive(["EOSE", subscriptionId]);
+    expect(onEose).toHaveBeenCalledOnce();
+    socket.receive(["CLOSED", subscriptionId, "rate-limited: retry in 500ms"]);
+    expect(onRetry).toHaveBeenCalledOnce();
+    expect(onClosed).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(500);
+    socket.receive(["CLOSED", subscriptionId, "error: unsupported filter"]);
+    expect(onClosed).toHaveBeenCalledOnce();
+    expect(onClosed.mock.calls[0]?.[0]).toEqual(expect.any(Error));
+    client.disconnect();
+  });
+
   it("cancels a pending retry when reconnecting a persistent subscription", async () => {
     const client = new BuzzRelayClient("wss://relay.example");
     const socket = await connectClient(client);
