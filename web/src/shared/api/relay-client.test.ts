@@ -8,6 +8,10 @@ vi.mock("@/shared/lib/nostr-signer", () => ({
   signNostrEvent: signer.sign,
 }));
 
+vi.mock("@/shared/lib/nip98", () => ({
+  makeNip98AuthHeader: vi.fn(async () => "Nostr test"),
+}));
+
 type SignRequest = {
   resolve: (event: SignedNostrEvent) => void;
   template: UnsignedNostrEvent;
@@ -117,6 +121,50 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
+});
+
+describe("BuzzRelayClient untrusted and stalled HTTP responses", () => {
+  it("drops an EVENT frame whose payload is not a Nostr event", async () => {
+    const client = new BuzzRelayClient("wss://relay.example");
+    const socket = await connectClient(client);
+    const onEvent = vi.fn();
+    await client.subscribe({ kinds: [9], limit: 0 }, onEvent);
+    const subscriptionId = lastSent(socket)[1];
+
+    socket.receive(["EVENT", subscriptionId, "not-an-event"]);
+    socket.receive(["EVENT", subscriptionId, { pubkey: 42, created_at: "soon" }]);
+    expect(onEvent).not.toHaveBeenCalled();
+
+    socket.receive([
+      "EVENT",
+      subscriptionId,
+      { id: "a".repeat(64), pubkey: "b".repeat(64), kind: 9, created_at: 1, content: "" },
+    ]);
+    expect(onEvent).toHaveBeenCalledOnce();
+    client.disconnect();
+  });
+
+  it("aborts an HTTP query the relay never answers", async () => {
+    const client = new BuzzRelayClient("wss://relay.example");
+    const fetchMock = vi.fn(
+      (_url: string, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () =>
+            reject(new DOMException("Aborted", "AbortError")),
+          );
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const pending = client.queryHttp([{ kinds: [40902] }]);
+    const rejection = expect(pending).rejects.toThrow();
+    await settleAsyncHandler();
+    await settleAsyncHandler();
+    expect(fetchMock).toHaveBeenCalledOnce();
+
+    await vi.advanceTimersByTimeAsync(25_000);
+    await rejection;
+  });
 });
 
 describe("BuzzRelayClient authentication reconnects", () => {

@@ -168,19 +168,17 @@ export function useBuzzSession({
         ...config.agents.map((agent) => agent.pubkey),
         ...nextDiscovered.flatMap((channel) => channel.members.map((member) => member.pubkey)),
       ];
-      await Promise.all([
-        loadProfiles(profilePubkeys),
-        client
-          .queryHttp([
-            {
-              kinds: [40902],
-              authors: [...new Set(profilePubkeys.map((value) => value.toLowerCase()))],
-              limit: profilePubkeys.length,
-            },
-          ])
-          .then((events) => applyPresenceEvents(events, profilePubkeys))
-          .catch(() => undefined),
-      ]);
+      void loadProfiles(profilePubkeys);
+      void client
+        .queryHttp([
+          {
+            kinds: [40902],
+            authors: [...new Set(profilePubkeys.map((value) => value.toLowerCase()))],
+            limit: profilePubkeys.length,
+          },
+        ])
+        .then((events) => applyPresenceEvents(events, profilePubkeys))
+        .catch(() => undefined);
       setDiscoveredChannels(nextDiscovered);
       setChannels(nextChannels);
       setSelectedChannelId((current) =>
@@ -445,14 +443,14 @@ export function useBuzzSession({
         const members = memberEvents[0]
           ? memberEvents[0].tags.filter((tag) => tag[0] === "p").map((tag) => tag[1])
           : [];
-        await loadProfiles([
+        setContentEvents(nextContentEvents);
+        void loadProfiles([
           ...members,
           ...nextContentEvents.map((event) => event.pubkey),
           ...nextContentEvents.flatMap(systemMessagePubkeys),
         ]);
         if (cancelled) return;
-        setContentEvents(nextContentEvents);
-        unsubscribeChannel = await client.subscribe(
+        const stopChannel = await client.subscribe(
           {
             kinds: [...TIMELINE_KINDS, ...AUXILIARY_KINDS],
             "#h": [selectedChannelId],
@@ -475,7 +473,12 @@ export function useBuzzSession({
             }
           },
         );
-        unsubscribeTyping = await client.subscribe(
+        if (cancelled) {
+          stopChannel();
+          return;
+        }
+        unsubscribeChannel = stopChannel;
+        const stopTyping = await client.subscribe(
           { kinds: [20002], "#h": [selectedChannelId], since: startedAt, limit: 0 },
           (event) => {
             if (event.pubkey.toLowerCase() === pubkey.toLowerCase()) return;
@@ -485,6 +488,11 @@ export function useBuzzSession({
             }));
           },
         );
+        if (cancelled) {
+          stopTyping();
+          return;
+        }
+        unsubscribeTyping = stopTyping;
       })
       .catch((loadError) => {
         if (!cancelled)

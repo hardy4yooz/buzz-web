@@ -184,21 +184,31 @@ export class BuzzRelayClient {
     const url = `${relayHttpOrigin(this.relayUrl)}/query`;
     const body = JSON.stringify(filters);
     const authorization = await makeNip98AuthHeader(url, "POST", { body });
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        Authorization: authorization,
-        "Content-Type": "application/json",
-      },
-      body,
-    });
-    if (!response.ok) {
-      const detail = (await response.text()).slice(0, 300);
-      throw new Error(
-        `${t("error.relayQueryHttp", { status: response.status })}${detail ? `: ${detail}` : ""}`,
-      );
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), OPERATION_TIMEOUT_MS);
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: authorization,
+          "Content-Type": "application/json",
+        },
+        body,
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        const detail = (await response.text()).slice(0, 300);
+        throw new Error(
+          `${t("error.relayQueryHttp", { status: response.status })}${detail ? `: ${detail}` : ""}`,
+        );
+      }
+      return (await response.json()) as NostrEvent[];
+    } catch (error) {
+      if (controller.signal.aborted) throw new Error(t("error.relayQueryTimeout"));
+      throw error;
+    } finally {
+      window.clearTimeout(timeout);
     }
-    return (await response.json()) as NostrEvent[];
   }
 
   async subscribe(
@@ -279,9 +289,17 @@ export class BuzzRelayClient {
     if (type === "EVENT" && typeof data[1] === "string" && data[2]) {
       const subscription = this.subscriptions.get(data[1]);
       if (!subscription) return;
-      const event = data[2] as NostrEvent;
-      if (subscription.persistent) subscription.onEvent(event);
-      else subscription.events?.push(event);
+      const event = data[2] as Partial<NostrEvent>;
+      if (
+        typeof event.id !== "string" ||
+        typeof event.pubkey !== "string" ||
+        typeof event.created_at !== "number" ||
+        typeof event.kind !== "number"
+      ) {
+        return;
+      }
+      if (subscription.persistent) subscription.onEvent(event as NostrEvent);
+      else subscription.events?.push(event as NostrEvent);
       return;
     }
     if (type === "EOSE" && typeof data[1] === "string") {

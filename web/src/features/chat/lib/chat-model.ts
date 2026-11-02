@@ -271,7 +271,7 @@ function metadataObject(content: string): Record<string, unknown> {
   }
 }
 
-function metadataDisplayName(metadata: Record<string, unknown>): string | undefined {
+export function metadataDisplayName(metadata: Record<string, unknown>): string | undefined {
   for (const key of ["display_name", "displayName", "name"] as const) {
     const value = metadata[key];
     if (typeof value === "string" && value.trim()) return value.trim();
