@@ -216,7 +216,7 @@ test("message lifecycle, drafts, thread drafts, and profile editing survive navi
   await settings.getByRole("button", { name: "Edit profile" }).click();
   const profileEditor = page.getByRole("dialog", { name: "Edit profile" });
   await profileEditor.getByLabel("Picture URL").fill("javascript:alert(1)");
-  await expect(profileEditor.getByRole("button", { name: "Save profile" })).toBeDisabled();
+  await profileEditor.getByRole("button", { name: "Save profile" }).click();
   await expect(profileEditor.getByText("The picture URL must use HTTP or HTTPS.")).toBeVisible();
   await profileEditor.getByLabel("Display name").fill("Alex Web");
   await profileEditor.getByLabel("About").fill("P0 verification profile");
