@@ -91,6 +91,18 @@ describe("relayAgentsFromEvents", () => {
     ]);
   });
 
+  it("labels an unnamed agent with the local readable fallback", () => {
+    const agents = relayAgentsFromEvents({
+      events: [event(1, {})],
+      configuredAgents: [],
+      channels: [channel()],
+      profiles: {},
+      presence: {},
+    });
+
+    expect(agents[0]?.name.startsWith("Agent ")).toBe(true);
+  });
+
   it("deduplicates configured agents and bot memberships regardless of pubkey casing", () => {
     const agents = relayAgentsFromEvents({
       events: [],

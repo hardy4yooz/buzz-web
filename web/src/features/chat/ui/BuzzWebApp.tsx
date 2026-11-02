@@ -4,7 +4,11 @@ import { toast } from "sonner";
 import buzzAppIcon from "@/assets/app-icon@3x.png";
 import { AgentsView } from "@/features/agents/ui/AgentsView";
 import { useRelayAgents } from "@/features/agents/use-relay-agents";
-import { channelDisplayName, threadReference } from "@/features/chat/lib/chat-model";
+import {
+  channelDisplayName,
+  fallbackProfile,
+  threadReference,
+} from "@/features/chat/lib/chat-model";
 import type { BuzzChannel, TimelineMessage } from "@/features/chat/lib/chat-types";
 import { conversationDraftKey } from "@/features/chat/lib/conversation-drafts";
 import { useBuzzSession } from "@/features/chat/lib/use-buzz-session";
@@ -652,15 +656,7 @@ function Workspace({
               <SettingsView
                 canInvite={canCreateChannel}
                 connectionState={state.connectionState}
-                profile={
-                  state.profiles[pubkey] ?? {
-                    pubkey,
-                    name: pubkey.slice(0, 12),
-                    about: "",
-                    picture: null,
-                    isAgent: false,
-                  }
-                }
+                profile={state.profiles[pubkey] ?? fallbackProfile(pubkey)}
                 pubkey={pubkey}
                 relayUrl={config.relayUrl}
                 onClose={() => setActiveTool(null)}

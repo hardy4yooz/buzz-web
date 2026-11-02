@@ -1,8 +1,8 @@
 import { Compass, Hash, LoaderCircle, MessageCircle, Plus, Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { profileDisplayName } from "@/features/chat/lib/chat-model";
 import type { BuzzChannel, SearchHit, UserProfile } from "@/features/chat/lib/chat-types";
 import { t } from "@/shared/i18n";
-import { truncatePubkey } from "@/shared/lib/pubkey";
 
 export function DialogFrame({
   title,
@@ -320,7 +320,7 @@ export function SearchDialog({
             >
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Hash className="h-3 w-3" /> {channel?.name ?? t("common.channel")} ·{" "}
-                {profile?.name ?? truncatePubkey(hit.event.pubkey)}
+                {profileDisplayName(profile, hit.event.pubkey)}
               </div>
               <p className="mt-1 line-clamp-2 text-sm leading-5">{hit.event.content}</p>
             </button>
