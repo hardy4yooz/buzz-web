@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { fallbackProfile } from "@/features/chat/lib/chat-model";
 import type {
   AttachmentDescriptor,
   ChannelMember,
@@ -9,7 +10,6 @@ import type {
 import { MessageComposer } from "@/features/chat/ui/MessageComposer";
 import { MessageRow } from "@/features/chat/ui/MessageList";
 import { t } from "@/shared/i18n";
-import { truncatePubkey } from "@/shared/lib/pubkey";
 import { RightPanelResizeHandle } from "@/shared/ui/right-panel-sizing";
 
 export function ThreadPanel({
@@ -72,13 +72,7 @@ export function ThreadPanel({
   );
   const replyTargetPubkey = replyTarget?.event.pubkey.toLowerCase() ?? "";
   const replyTargetProfile = replyTarget
-    ? (profiles[replyTargetPubkey] ?? {
-        pubkey: replyTargetPubkey,
-        name: truncatePubkey(replyTargetPubkey),
-        about: "",
-        picture: null,
-        isAgent: false,
-      })
+    ? (profiles[replyTargetPubkey] ?? fallbackProfile(replyTargetPubkey))
     : null;
 
   useEffect(() => {
@@ -120,13 +114,7 @@ export function ThreadPanel({
       <div className="buzz-scrollbar min-h-0 flex-1 overflow-y-auto py-3">
         {threadMessages.map((message) => {
           const pubkey = message.event.pubkey.toLowerCase();
-          const profile = profiles[pubkey] ?? {
-            pubkey,
-            name: truncatePubkey(pubkey),
-            about: "",
-            picture: null,
-            isAgent: false,
-          };
+          const profile = profiles[pubkey] ?? fallbackProfile(pubkey);
           return (
             <MessageRow
               canModerate={canModerate}

@@ -116,7 +116,7 @@ test("channel discovery, shared preferences, archive, and member management work
   await members.getByLabel("Member public key").fill("c".repeat(64));
   await members.getByLabel("Role").selectOption("guest");
   await members.getByRole("button", { name: "Add member" }).last().click();
-  const memberName = "cccccccc…cccc";
+  const memberName = "Member cccccccc…cccc";
   const roleSelect = page.getByRole("combobox", { name: `Change ${memberName}'s role` });
   await expect(roleSelect).toHaveValue("guest");
   await roleSelect.selectOption("admin");

@@ -9,12 +9,12 @@ import {
   Trash2,
 } from "lucide-react";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { fallbackProfile } from "@/features/chat/lib/chat-model";
 import type { TimelineMessage, UserProfile } from "@/features/chat/lib/chat-types";
 import { Avatar } from "@/features/chat/ui/Avatar";
 import { MessageContent } from "@/features/chat/ui/MessageContent";
 import { SystemMessageRow } from "@/features/chat/ui/SystemMessageRow";
 import { getLocale, t } from "@/shared/i18n";
-import { truncatePubkey } from "@/shared/lib/pubkey";
 
 const QUICK_REACTIONS = ["👀", "💬", "👍", "❤️"];
 const THREAD_PARTICIPANT_LIMIT = 3;
@@ -59,15 +59,7 @@ export function summarizeThreads(
 
 function profileForPubkey(profiles: Record<string, UserProfile>, pubkey: string): UserProfile {
   const normalized = pubkey.toLowerCase();
-  return (
-    profiles[normalized] ?? {
-      pubkey: normalized,
-      name: truncatePubkey(normalized),
-      about: "",
-      picture: null,
-      isAgent: false,
-    }
-  );
+  return profiles[normalized] ?? fallbackProfile(normalized);
 }
 
 export function MessageRow({

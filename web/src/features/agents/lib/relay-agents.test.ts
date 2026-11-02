@@ -34,6 +34,52 @@ function channel(): BuzzChannel {
 }
 
 describe("relayAgentsFromEvents", () => {
+  it("counts ordinary membership for known agents without discovering ordinary users", () => {
+    const ordinary = channel();
+    ordinary.members = [
+      { pubkey: CONFIGURED, role: "member" },
+      { pubkey: AGENT, role: "member" },
+    ];
+    const agents = relayAgentsFromEvents({
+      events: [],
+      configuredAgents: [{ pubkey: CONFIGURED, name: "Assistant" }],
+      channels: [ordinary],
+      profiles: {},
+      presence: {},
+    });
+    expect(agents).toHaveLength(1);
+    expect(agents[0]).toMatchObject({
+      pubkey: CONFIGURED,
+      channelIds: [ordinary.id],
+      status: "offline",
+      startable: false,
+    });
+  });
+
+  it("ignores a blank display_name in favour of a real name", () => {
+    const agents = relayAgentsFromEvents({
+      events: [event(1, { display_name: "  ", name: "Codex(remote)" })],
+      configuredAgents: [],
+      channels: [],
+      profiles: {},
+      presence: {},
+    });
+    expect(agents[0]?.name).toBe("Codex(remote)");
+  });
+
+  it("handles non-object agent metadata", () => {
+    const malformed = event(1, {});
+    malformed.content = "null";
+    expect(() =>
+      relayAgentsFromEvents({
+        events: [malformed],
+        configuredAgents: [],
+        channels: [],
+        profiles: {},
+        presence: {},
+      }),
+    ).not.toThrow();
+  });
   it("uses the latest agent profile and actual bot membership", () => {
     const profiles: Record<string, UserProfile> = {
       [AGENT]: {
@@ -89,6 +135,18 @@ describe("relayAgentsFromEvents", () => {
         status: "offline",
       }),
     ]);
+  });
+
+  it("labels an unnamed agent with the local readable fallback", () => {
+    const agents = relayAgentsFromEvents({
+      events: [event(1, {})],
+      configuredAgents: [],
+      channels: [channel()],
+      profiles: {},
+      presence: {},
+    });
+
+    expect(agents[0]?.name.startsWith("Agent ")).toBe(true);
   });
 
   it("deduplicates configured agents and bot memberships regardless of pubkey casing", () => {
