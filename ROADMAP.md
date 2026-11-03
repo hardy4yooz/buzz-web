@@ -129,7 +129,14 @@ Inbox approval handling remains the first supported action surface.
 
 ## P3: Platform Capabilities
 
-Planned research areas include multi-community switching, Web Push notifications, Pulse,
+**Open-tab notifications (implemented).** Settings → Notifications lets each device opt in to
+desktop notifications for mentions, direct messages, thread replies, and pending approvals while
+Buzz Web is open. Delivery is foreground or hidden-tab only: it notifies from the live inbox, uses
+the community name and one fixed body string (never a sender, channel name, or message text), and
+makes no exactly-once promise. Closed-tab and offline Web Push remain unimplemented because the
+Relay has no APNs-style push path; that stays a platform research item.
+
+Planned research areas include multi-community switching, closed-tab Web Push, Pulse,
 WebRTC-based Huddles, and a controlled remote terminal. These features need browser-native security
 designs and cannot copy Tauri APIs directly.
 

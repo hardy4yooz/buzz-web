@@ -488,6 +488,38 @@ const messages = {
   "message.sendFailed": { en: "Failed to send", "zh-CN": "发送失败" },
   "message.shareImage": { en: "Share image", "zh-CN": "分享图片" },
   "message.startConversation": { en: "Start the conversation", "zh-CN": "开始这段对话" },
+  "notify.blocked": {
+    en: "Notifications are blocked for this site. Allow them in your browser settings.",
+    "zh-CN": "此站点已阻止通知。请在浏览器设置中允许通知。",
+  },
+  "notify.body": { en: "New activity in Buzz", "zh-CN": "Buzz 有新动态" },
+  "notify.checking": {
+    en: "Checking notification support…",
+    "zh-CN": "正在检查通知支持情况…",
+  },
+  "notify.description": {
+    en: "Show a desktop notification when Buzz Web is in the background and something needs your attention.",
+    "zh-CN": "当 Buzz Web 在后台且有待处理事项时，显示桌面通知。",
+  },
+  "notify.enable": { en: "Enable notifications", "zh-CN": "启用通知" },
+  "notify.off": { en: "Off", "zh-CN": "已关闭" },
+  "notify.on": { en: "On", "zh-CN": "已开启" },
+  "notify.privacy": {
+    en: "Notifications never include message content, channel names, or senders.",
+    "zh-CN": "通知不会包含消息内容、频道名称或发送者。",
+  },
+  "notify.retry": { en: "Retry", "zh-CN": "重试" },
+  "notify.title": { en: "Notifications", "zh-CN": "通知" },
+  "notify.turnOff": { en: "Turn off", "zh-CN": "关闭" },
+  "notify.turnOn": { en: "Turn on", "zh-CN": "开启" },
+  "notify.unavailable": {
+    en: "Notifications cannot start because the background service is not ready.",
+    "zh-CN": "后台服务尚未就绪，无法开启通知。",
+  },
+  "notify.unsupported": {
+    en: "This browser cannot show desktop notifications.",
+    "zh-CN": "此浏览器无法显示桌面通知。",
+  },
   "profile.about": { en: "About", "zh-CN": "简介" },
   "profile.name": { en: "Display name", "zh-CN": "显示名称" },
   "profile.picture": { en: "Picture URL", "zh-CN": "头像地址" },

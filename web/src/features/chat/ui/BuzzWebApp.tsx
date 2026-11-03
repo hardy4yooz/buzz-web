@@ -39,6 +39,8 @@ import { CommunityInviteDialog } from "@/features/community/ui/CommunityInviteDi
 import type { InboxItem } from "@/features/inbox/lib/inbox-model";
 import { InboxView } from "@/features/inbox/ui/InboxView";
 import { useInbox } from "@/features/inbox/use-inbox";
+import { useForegroundNotifications } from "@/features/notifications/use-foreground-notifications";
+import { useNotificationClicks } from "@/features/notifications/use-notification-clicks";
 import { ReposPanel } from "@/features/repos/ui/ReposPanel";
 import { clearMediaObjectUrls } from "@/shared/api/media-client";
 import { BuzzRelayClient } from "@/shared/api/relay-client";
@@ -135,6 +137,13 @@ function Workspace({
     ensureProfiles: session.ensureProfiles,
     readContexts: userState.contexts,
     markContextRead: userState.markContextRead,
+  });
+  const notifications = useForegroundNotifications({
+    relayUrl: config.relayUrl,
+    pubkey,
+    communityName: config.communityName,
+    items: inbox.items,
+    loading: inbox.loading,
   });
   const threadRoot = state.messages.find((message) => message.event.id === threadRootId) ?? null;
   const threadReplyTarget =
@@ -290,6 +299,13 @@ function Workspace({
     setFocusedMessageId(eventId);
     session.revealMessage({ channelId, eventId, threadRootId: threadId });
   };
+  useNotificationClicks({
+    scopeId: notifications.scopeId,
+    channelsLoaded: !state.loadingChannels,
+    hasChannel: (channelId) => state.channels.some((channel) => channel.id === channelId),
+    openInbox: () => setActiveTool("inbox"),
+    openMessage: revealMessage,
+  });
   const openInboxConversation = (item: InboxItem) => {
     if (!item.channelId) return;
     revealMessage(item.channelId, item.event.id, item.threadRootId);
@@ -652,6 +668,7 @@ function Workspace({
               <SettingsView
                 canInvite={canCreateChannel}
                 connectionState={state.connectionState}
+                notifications={notifications}
                 profile={
                   state.profiles[pubkey] ?? {
                     pubkey,
