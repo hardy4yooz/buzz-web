@@ -4,9 +4,9 @@ import type {
   AgentActivityItem,
   AgentActivityStatus,
 } from "@/features/chat/lib/agent-activity";
+import { profileDisplayName } from "@/features/chat/lib/chat-model";
 import type { UserProfile } from "@/features/chat/lib/chat-types";
 import { getLocale, t } from "@/shared/i18n";
-import { truncatePubkey } from "@/shared/lib/pubkey";
 import { RightPanelResizeHandle } from "@/shared/ui/right-panel-sizing";
 
 function stateLabel(state: ActivityState): string {
@@ -95,7 +95,7 @@ export function AgentActivityPanel({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-baseline justify-between gap-2">
                         <p className="min-w-0 truncate text-xs font-semibold">
-                          {profile?.name ?? truncatePubkey(item.agentPubkey)} ·{" "}
+                          {profileDisplayName(profile, item.agentPubkey, true)} ·{" "}
                           {item.presentation.title}
                         </p>
                         <time className="shrink-0 text-[9px] text-muted-foreground">

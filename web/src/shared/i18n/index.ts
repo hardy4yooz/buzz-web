@@ -10,6 +10,7 @@ const messages = {
   "common.copied": { en: "Copied to clipboard", "zh-CN": "已复制到剪贴板" },
   "common.create": { en: "Create", "zh-CN": "创建" },
   "common.download": { en: "Download", "zh-CN": "下载" },
+  "common.member": { en: "Member", "zh-CN": "成员" },
   "common.messages": { en: "Messages", "zh-CN": "消息" },
   "common.private": { en: "Private", "zh-CN": "私有" },
   "common.refresh": { en: "Refresh", "zh-CN": "刷新" },

@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { fallbackProfile } from "@/features/chat/lib/chat-model";
 import type { UserProfile } from "@/features/chat/lib/chat-types";
 import { Avatar } from "@/features/chat/ui/Avatar";
 import {
@@ -60,16 +61,6 @@ function safeWebUrl(value: string | null): string | null {
   } catch {
     return null;
   }
-}
-
-function fallbackProfile(pubkey: string): UserProfile {
-  return {
-    pubkey,
-    name: truncatePubkey(pubkey),
-    about: "",
-    picture: null,
-    isAgent: false,
-  };
 }
 
 function contributionData(repos: readonly Repo[]) {

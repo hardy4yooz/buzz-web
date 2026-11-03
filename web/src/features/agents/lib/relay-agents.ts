@@ -1,7 +1,7 @@
+import { profileDisplayName } from "@/features/chat/lib/chat-model";
 import type { BuzzChannel, UserProfile } from "@/features/chat/lib/chat-types";
 import type { NostrEvent } from "@/shared/api/nostr-types";
 import type { ConfiguredAgent } from "@/shared/config/runtime-config";
-import { truncatePubkey } from "@/shared/lib/pubkey";
 
 export type AgentRespondTo = "owner-only" | "allowlist" | "anyone";
 
@@ -86,8 +86,7 @@ export function relayAgentsFromEvents({
         name:
           (typeof nameValue === "string" && nameValue.trim()) ||
           configured.get(pubkey)?.name ||
-          profile?.name ||
-          truncatePubkey(pubkey),
+          profileDisplayName(profile, pubkey, true),
         agentType:
           typeof content.agent_type === "string" && content.agent_type.trim()
             ? content.agent_type.trim()
