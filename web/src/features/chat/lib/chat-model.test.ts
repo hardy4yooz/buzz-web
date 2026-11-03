@@ -6,6 +6,7 @@ import {
   contentWithAttachments,
   describeSystemMessage,
   fallbackProfile,
+  isValidProfilePicture,
   mergeProfileMetadata,
   messageRecipientPubkeys,
   parseCommunityRole,
@@ -38,6 +39,16 @@ function event(
     sig: "aa".repeat(64),
   };
 }
+
+describe("profile picture validation", () => {
+  it("accepts empty and HTTP(S) URLs, rejects malformed and other protocols", () => {
+    expect(isValidProfilePicture("")).toBe(true);
+    expect(isValidProfilePicture(" https://example.com/avatar.png ")).toBe(true);
+    expect(isValidProfilePicture("http://example.com/avatar.png")).toBe(true);
+    expect(isValidProfilePicture("not-a-url")).toBe(false);
+    expect(isValidProfilePicture("ftp://example.com/avatar.png")).toBe(false);
+  });
+});
 
 describe("Buzz channel model", () => {
   it("parses NIP-29 channel metadata and member roles", () => {

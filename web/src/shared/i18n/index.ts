@@ -986,6 +986,10 @@ const messages = {
   },
   "error.relayQueryTimeout": { en: "Relay query timed out.", "zh-CN": "Relay 查询超时。" },
   "error.relaySessionClosed": { en: "Relay session disconnected.", "zh-CN": "Relay 会话已断开。" },
+  "error.relayUnavailable": {
+    en: "Relay connection unavailable.",
+    "zh-CN": "Relay 连接不可用。",
+  },
   "error.relaySocketUnavailable": {
     en: "The Relay WebSocket is not connected.",
     "zh-CN": "Relay WebSocket 尚未连接。",

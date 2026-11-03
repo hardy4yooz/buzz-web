@@ -2,6 +2,7 @@ import { useCallback, useRef } from "react";
 import {
   buildMessageTags,
   fallbackProfile,
+  isValidProfilePicture,
   mergeProfileMetadata,
   messageRecipientPubkeys,
   resolveMentionPubkeys,
@@ -521,16 +522,8 @@ export function useSessionMutations({
       const name = input.name.trim();
       if (!name) throw new Error(t("error.profileName"));
       const picture = input.picture.trim();
-      if (picture) {
-        let protocol: string;
-        try {
-          protocol = new URL(picture).protocol;
-        } catch {
-          throw new Error(t("error.profilePicture"));
-        }
-        if (protocol !== "https:" && protocol !== "http:") {
-          throw new Error(t("error.profilePicture"));
-        }
+      if (!isValidProfilePicture(picture)) {
+        throw new Error(t("error.profilePicture"));
       }
       const about = input.about.trim();
       let currentContent: string | undefined;

@@ -25,6 +25,7 @@ export function ChannelBrowserDialog({
   currentPubkey,
   allowForum,
   canCreate,
+  connected,
   initialView = "browse",
   onClose,
   onCreate,
@@ -36,6 +37,7 @@ export function ChannelBrowserDialog({
   currentPubkey: string;
   allowForum: boolean;
   canCreate: boolean;
+  connected: boolean;
   initialView?: "browse" | "create";
   onClose: () => void;
   onCreate: (input: CreateChannelInput) => Promise<unknown>;
@@ -220,7 +222,9 @@ export function ChannelBrowserDialog({
             {!visible.length ? (
               <div className="flex flex-col items-center px-6 py-14 text-center text-muted-foreground">
                 <Compass className="h-6 w-6" />
-                <p className="mt-3 text-sm">{t("channel.empty")}</p>
+                <p className="mt-3 text-sm">
+                  {connected ? t("channel.empty") : t("error.relayUnavailable")}
+                </p>
               </div>
             ) : null}
             {error ? <p className="px-3 py-2 text-xs text-destructive">{error}</p> : null}

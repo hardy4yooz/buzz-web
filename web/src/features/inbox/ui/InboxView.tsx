@@ -63,6 +63,7 @@ export function InboxView({
   channels,
   profiles,
   relayUrl,
+  connected,
   loading,
   error,
   approvalPending,
@@ -78,6 +79,7 @@ export function InboxView({
   channels: readonly BuzzChannel[];
   profiles: Readonly<Record<string, UserProfile>>;
   relayUrl: string;
+  connected: boolean;
   loading: boolean;
   error: string | null;
   approvalPending: string | null;
@@ -280,7 +282,9 @@ export function InboxView({
           {!loading && !visibleItems.length ? (
             <div className="px-5 py-14 text-center">
               <Mail className="mx-auto h-8 w-8 text-muted-foreground/50" />
-              <p className="mt-3 text-sm text-muted-foreground">{t("inbox.empty")}</p>
+              <p className="mt-3 text-sm text-muted-foreground">
+                {connected ? t("inbox.empty") : t("error.relayUnavailable")}
+              </p>
             </div>
           ) : null}
           {loading && !visibleItems.length ? (
@@ -430,7 +434,9 @@ export function InboxView({
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center px-6 text-center text-muted-foreground">
             <Mail className="h-9 w-9 opacity-45" />
-            <p className="mt-3 text-sm">{t("inbox.empty")}</p>
+            <p className="mt-3 text-sm">
+              {connected ? t("inbox.empty") : t("error.relayUnavailable")}
+            </p>
           </div>
         )}
       </section>

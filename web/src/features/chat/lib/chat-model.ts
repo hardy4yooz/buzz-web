@@ -279,6 +279,17 @@ export function profilesFromEvents(
   return profiles;
 }
 
+export function isValidProfilePicture(picture: string): boolean {
+  const value = picture.trim();
+  if (!value) return true;
+  try {
+    const protocol = new URL(value).protocol;
+    return protocol === "http:" || protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 export function mergeProfileMetadata(
   currentContent: string | undefined,
   input: { name: string; about: string; picture: string },

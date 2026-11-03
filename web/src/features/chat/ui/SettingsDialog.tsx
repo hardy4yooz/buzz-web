@@ -13,6 +13,7 @@ import {
   UserRoundPlus,
 } from "lucide-react";
 import { useState } from "react";
+import { isValidProfilePicture } from "@/features/chat/lib/chat-model";
 import type { UserProfile } from "@/features/chat/lib/chat-types";
 import { connectionStateLabel } from "@/features/chat/lib/connection-state";
 import { DialogFrame } from "@/features/chat/ui/AppDialogs";
@@ -40,6 +41,7 @@ function ProfileEditor({
   const [picture, setPicture] = useState(profile.picture ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const pictureInvalid = !isValidProfilePicture(picture);
   return (
     <DialogFrame title={t("settings.editProfile")} onClose={onClose}>
       <form
@@ -86,6 +88,11 @@ function ProfileEditor({
             onChange={(event) => setPicture(event.target.value)}
           />
         </label>
+        {pictureInvalid ? (
+          <p className="text-xs text-destructive" role="alert">
+            {t("error.profilePicture")}
+          </p>
+        ) : null}
         {error ? <p className="text-xs text-destructive">{error}</p> : null}
         <div className="flex justify-end gap-2 border-t pt-4">
           <button
@@ -97,7 +104,7 @@ function ProfileEditor({
           </button>
           <button
             className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-40"
-            disabled={!name.trim() || saving}
+            disabled={!name.trim() || pictureInvalid || saving}
             type="submit"
           >
             {saving ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
