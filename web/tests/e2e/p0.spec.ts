@@ -130,7 +130,7 @@ test("channel discovery, shared preferences, archive, and member management work
   await members.getByLabel("Member public key").fill("c".repeat(64));
   await members.getByLabel("Role").selectOption("guest");
   await members.getByRole("button", { name: "Add member" }).last().click();
-  const memberName = "cccccccc…cccc";
+  const memberName = "Member cccccccc…cccc";
   const roleSelect = page.getByRole("combobox", { name: `Change ${memberName}'s role` });
   await expect(roleSelect).toHaveValue("guest");
   await roleSelect.selectOption("admin");
@@ -230,7 +230,7 @@ test("message lifecycle, drafts, thread drafts, and profile editing survive navi
   await settings.getByRole("button", { name: "Edit profile" }).click();
   const profileEditor = page.getByRole("dialog", { name: "Edit profile" });
   await profileEditor.getByLabel("Picture URL").fill("javascript:alert(1)");
-  await profileEditor.getByRole("button", { name: "Save profile" }).click();
+  await expect(profileEditor.getByRole("button", { name: "Save profile" })).toBeDisabled();
   await expect(profileEditor.getByText("The picture URL must use HTTP or HTTPS.")).toBeVisible();
   await profileEditor.getByLabel("Display name").fill("Alex Web");
   await profileEditor.getByLabel("About").fill("P0 verification profile");
