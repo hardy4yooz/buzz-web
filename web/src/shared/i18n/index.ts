@@ -322,6 +322,48 @@ const messages = {
   "invite.ttlThirtyDays": { en: "30 days", "zh-CN": "30 天" },
   "invite.twentyFiveUses": { en: "25 uses", "zh-CN": "25 次" },
   "invite.useLimit": { en: "Limit number of uses", "zh-CN": "使用次数" },
+  "repos.activityApplied": { en: "Applied", "zh-CN": "已应用" },
+  "repos.activityClosed": { en: "Closed", "zh-CN": "已关闭" },
+  "repos.activityDisclaimer": {
+    en: "Recent Relay activity only, never the full history. Issue and pull-request text is stored Relay-wide, so any member who can read this Relay can read it even when repository Git access is separate.",
+    "zh-CN":
+      "这里只显示 Relay 上的近期活动，并非完整历史。Issue 与 Pull Request 的正文存储在整个 Relay 中，因此任何能读取此 Relay 的成员都可以看到，即使仓库 Git 访问权限另有控制。",
+  },
+  "repos.activityDraft": { en: "Draft", "zh-CN": "草稿" },
+  "repos.activityIncomplete": {
+    en: "No issues or pull requests from the loaded repositories are in the recent Relay activity.",
+    "zh-CN": "在近期 Relay 活动中，没有来自已加载仓库的 Issue 或 Pull Request。",
+  },
+  "repos.activityLoadFailed": {
+    en: "Failed to load recent repository activity",
+    "zh-CN": "无法加载仓库近期活动",
+  },
+  "repos.activityLoading": { en: "Loading recent activity", "zh-CN": "正在加载近期活动" },
+  "repos.activityMerged": { en: "Merged", "zh-CN": "已合并" },
+  "repos.activityOpen": { en: "Open", "zh-CN": "开放" },
+  "repos.activityOpenRepo": {
+    en: "Open repository {repository}",
+    "zh-CN": "打开仓库 {repository}",
+  },
+  "repos.activityRetry": { en: "Try again", "zh-CN": "重试" },
+  "repos.activityStatusBy": {
+    en: "Status published by {actor}",
+    "zh-CN": "状态由 {actor} 发布",
+  },
+  "repos.activityStatusPolicy": {
+    en: "Status is shown only when published by the issue or pull-request author or the repository owner. Anyone with Relay write access can publish an issue or pull request.",
+    "zh-CN":
+      "仅当状态由 Issue 或 Pull Request 作者、或仓库所有者发布时才显示。任何拥有此 Relay 写入权限的人都可以发布 Issue 或 Pull Request。",
+  },
+  "repos.activityUnavailable": {
+    en: "Activity is not loaded for this view.",
+    "zh-CN": "此视图未加载活动。",
+  },
+  "repos.activityUnknown": { en: "Not loaded", "zh-CN": "未加载" },
+  "repos.activityWindow": {
+    en: "The newest {count} Relay events were checked; older activity is not included.",
+    "zh-CN": "仅检查了最新的 {count} 条 Relay 事件，未包含更早的活动。",
+  },
   "repos.backToList": { en: "Back to repositories", "zh-CN": "返回仓库列表" },
   "repos.backToRepository": { en: "Back to repository", "zh-CN": "返回仓库" },
   "repos.binaryFile": {

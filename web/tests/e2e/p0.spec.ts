@@ -1448,3 +1448,263 @@ test("denied repository and blob pages surface localized errors at both widths",
     await context.close();
   }
 });
+
+// ---------------------------------------------------------------------------
+// Repository activity (NIP-34 issues/PRs) is a read-only, bounded Relay query.
+// The Relay is synthetic; the client join, status trust, and tab rendering run
+// unmodified.
+// ---------------------------------------------------------------------------
+
+const ACTIVITY_OWNER = "c".repeat(64);
+const ACTIVITY_OTHER_OWNER = "d".repeat(64);
+const ACTIVITY_ISSUE_AUTHOR = "e".repeat(64);
+const ACTIVITY_PR_AUTHOR = "f".repeat(64);
+const ACTIVITY_STRANGER = "9".repeat(64);
+const ACTIVITY_REPO_ID = "activity-fixture";
+const ACTIVITY_CONFIG = {
+  communityName: "Repo Activity",
+  relayUrl: CACHE_RELAY,
+  agentControlUrl: null,
+  features: { projects: true, forum: false },
+  demoMode: false,
+  agents: [],
+};
+
+function repoActivityEvents(now: number) {
+  return [
+    {
+      id: "1".repeat(64),
+      pubkey: ACTIVITY_OWNER,
+      created_at: now - 86_400,
+      kind: 30617,
+      tags: [
+        ["d", ACTIVITY_REPO_ID],
+        ["name", ACTIVITY_REPO_ID],
+        ["description", "Synthetic activity fixture"],
+      ],
+      content: "",
+      sig: "0".repeat(128),
+    },
+    {
+      id: "3".repeat(64),
+      pubkey: ACTIVITY_ISSUE_AUTHOR,
+      created_at: now - 7_200,
+      kind: 1621,
+      tags: [
+        ["a", `30617:${ACTIVITY_OWNER}:${ACTIVITY_REPO_ID}`],
+        ["p", ACTIVITY_OWNER],
+        ["subject", "Published issue title"],
+      ],
+      content: "Published issue body",
+      sig: "0".repeat(128),
+    },
+    {
+      id: "4".repeat(64),
+      pubkey: ACTIVITY_PR_AUTHOR,
+      created_at: now - 3_600,
+      kind: 1618,
+      tags: [
+        ["a", `30617:${ACTIVITY_OWNER}:${ACTIVITY_REPO_ID}`],
+        ["p", ACTIVITY_OWNER],
+        ["subject", "Published pull request title"],
+      ],
+      content: "Published pull request body",
+      sig: "0".repeat(128),
+    },
+    {
+      id: "5".repeat(64),
+      pubkey: ACTIVITY_OWNER,
+      created_at: now - 1_800,
+      kind: 1631,
+      tags: [["e", "4".repeat(64)]],
+      content: "",
+      sig: "0".repeat(128),
+    },
+    {
+      // Same `d`, different owner, and no matching announcement: must not join.
+      id: "6".repeat(64),
+      pubkey: ACTIVITY_OTHER_OWNER,
+      created_at: now - 900,
+      kind: 1621,
+      tags: [
+        ["a", `30617:${ACTIVITY_OTHER_OWNER}:${ACTIVITY_REPO_ID}`],
+        ["p", ACTIVITY_OTHER_OWNER],
+        ["subject", "Unrelated issue title"],
+      ],
+      content: "Unrelated issue body",
+      sig: "0".repeat(128),
+    },
+    {
+      id: "7".repeat(64),
+      pubkey: ACTIVITY_OTHER_OWNER,
+      created_at: now - 600,
+      kind: 1618,
+      tags: [
+        ["a", `30617:${ACTIVITY_OTHER_OWNER}:${ACTIVITY_REPO_ID}`],
+        ["p", ACTIVITY_OTHER_OWNER],
+        ["subject", "Unrelated pull request title"],
+      ],
+      content: "Unrelated pull request body",
+      sig: "0".repeat(128),
+    },
+    {
+      id: "8".repeat(64),
+      pubkey: ACTIVITY_STRANGER,
+      created_at: now - 300,
+      kind: 1632,
+      tags: [["e", "3".repeat(64)]],
+      content: "",
+      sig: "0".repeat(128),
+    },
+  ];
+}
+
+async function mockRepoActivityRelay(page: Page, events: readonly { kind: number }[]) {
+  await page.routeWebSocket(CACHE_RELAY, (ws) => {
+    ws.send(JSON.stringify(["AUTH", "repo-activity-challenge"]));
+    ws.onMessage((message) => {
+      const data = JSON.parse(String(message));
+      if (data[0] === "AUTH") {
+        ws.send(JSON.stringify(["OK", data[1].id, true, ""]));
+        return;
+      }
+      if (data[0] !== "REQ") return;
+      const [, subscriptionId, filter] = data;
+      for (const event of events) {
+        if (!(filter.kinds ?? []).includes(event.kind)) continue;
+        ws.send(JSON.stringify(["EVENT", subscriptionId, event]));
+      }
+      ws.send(JSON.stringify(["EOSE", subscriptionId]));
+    });
+  });
+  await page.route("**/query", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: "[]" }),
+  );
+}
+
+test("repository activity shows published issues and PRs without leaking other repositories", async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const events = repoActivityEvents(Math.floor(Date.now() / 1_000));
+
+  await mockRepoActivityRelay(page, events);
+
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+
+  await useConfig(page, ACTIVITY_CONFIG);
+  await page.goto("/");
+  await createIdentity(page, "repo activity passphrase");
+  await openProjects(page);
+
+  const panel = page.getByTestId("workspace-tool-repos");
+  await expect(panel.getByRole("group", { name: "Pull Requests" })).toContainText("1");
+  await expect(panel.getByRole("group", { name: "Issues" })).toContainText("1");
+
+  const issuesTab = panel.getByRole("tab", { name: "Issues" });
+  await issuesTab.click();
+  await expect(issuesTab).toHaveAttribute("aria-selected", "true");
+  await expect(panel.getByText("Published issue title")).toBeVisible();
+  await expect(panel.getByText("Unrelated issue title")).toHaveCount(0);
+  await expect(panel.getByText("Open", { exact: true })).toBeVisible();
+  await expect(panel.getByText(/Recent Relay activity only/)).toBeVisible();
+  await page.screenshot({
+    path: "/tmp/opencode/repo-activity/en-1440x900-issues.png",
+    animations: "disabled",
+  });
+
+  const prTab = panel.getByRole("tab", { name: "Pull Requests" });
+  await prTab.click();
+  await expect(prTab).toHaveAttribute("aria-selected", "true");
+  await expect(panel.getByText("Published pull request title")).toBeVisible();
+  await expect(panel.getByText("Unrelated pull request title")).toHaveCount(0);
+  await expect(panel.getByText("Merged", { exact: true })).toBeVisible();
+  await page.screenshot({
+    path: "/tmp/opencode/repo-activity/en-1440x900-pull-requests.png",
+    animations: "disabled",
+  });
+
+  await issuesTab.click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  const closeChannels = page.getByRole("button", { name: "Close channel list" });
+  if (await closeChannels.isVisible().catch(() => false)) {
+    await closeChannels.click();
+    await expect(closeChannels).toHaveCount(0);
+    await expect
+      .poll(async () => (await page.locator("aside").first().boundingBox())?.x ?? 0)
+      .toBeLessThanOrEqual(-280);
+  }
+  await expect(panel.getByText("Published issue title")).toBeVisible();
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
+  await page.screenshot({
+    path: "/tmp/opencode/repo-activity/en-390x844-issues.png",
+    animations: "disabled",
+  });
+  await prTab.click();
+  await expect(panel.getByText("Published pull request title")).toBeVisible();
+  await page.screenshot({
+    path: "/tmp/opencode/repo-activity/en-390x844-pull-requests.png",
+    animations: "disabled",
+  });
+
+  expect(pageErrors).toEqual([]);
+});
+
+test("repository activity uses Simplified Chinese in a Chinese browser", async ({ browser }) => {
+  test.setTimeout(180_000);
+  const context = await browser.newContext({ locale: "zh-CN" });
+  const page = await context.newPage();
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockRepoActivityRelay(page, repoActivityEvents(Math.floor(Date.now() / 1_000)));
+
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+
+  await useConfig(page, ACTIVITY_CONFIG);
+  await page.goto("/");
+  await page.getByRole("button", { name: "新建", exact: true }).click();
+  await page.getByLabel("新保险库口令").fill("repo activity zh passphrase");
+  await page.getByLabel("确认口令").fill("repo activity zh passphrase");
+  await page.getByLabel("我明白，如果加密保险库和备份均丢失，Buzz 无法恢复此身份。").check();
+  await page.getByRole("button", { name: "新建", exact: true }).click();
+  await expect(page.getByRole("button", { name: "个人菜单" })).toBeVisible();
+
+  await page.getByRole("button", { name: "项目", exact: true }).filter({ visible: true }).click();
+  const panel = page.getByTestId("workspace-tool-repos");
+  await expect(panel.getByRole("group", { name: "Issues" })).toContainText("1");
+  await expect(panel.getByRole("group", { name: "Pull Requests" })).toContainText("1");
+
+  await panel.getByRole("tab", { name: "Issues" }).click();
+  await expect(panel.getByText("Published issue title")).toBeVisible();
+  await expect(panel.getByText("开放", { exact: true })).toBeVisible();
+  await expect(panel.getByText(/这里只显示 Relay 上的近期活动/)).toBeVisible();
+  await expect(panel.getByText(/仅当状态由 Issue 或 Pull Request 作者/)).toBeVisible();
+  await page.screenshot({
+    path: "/tmp/opencode/repo-activity/zh-CN-1440x900-issues.png",
+    animations: "disabled",
+  });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const closeChannels = page.getByRole("button", { name: "关闭频道列表" });
+  if (await closeChannels.isVisible().catch(() => false)) {
+    await closeChannels.click();
+    await expect(closeChannels).toHaveCount(0);
+  }
+  await expect(panel.getByText("Published issue title")).toBeVisible();
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
+  await page.screenshot({
+    path: "/tmp/opencode/repo-activity/zh-CN-390x844-issues.png",
+    animations: "disabled",
+  });
+
+  expect(pageErrors).toEqual([]);
+  await context.close();
+});
