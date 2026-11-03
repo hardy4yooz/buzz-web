@@ -1,4 +1,4 @@
-import { profileDisplayName } from "@/features/chat/lib/chat-model";
+import { metadataDisplayName, profileDisplayName } from "@/features/chat/lib/chat-model";
 import type { BuzzChannel, UserProfile } from "@/features/chat/lib/chat-types";
 import type { NostrEvent } from "@/shared/api/nostr-types";
 import type { ConfiguredAgent } from "@/shared/config/runtime-config";
@@ -61,30 +61,36 @@ export function relayAgentsFromEvents({
       .map((member) => member.pubkey.toLowerCase()),
   );
   const pubkeys = new Set([...latest.keys(), ...configured.keys(), ...botPubkeys]);
+  const channelsByPubkey = new Map<string, string[]>();
+  for (const channel of channels) {
+    for (const member of channel.members) {
+      const pubkey = member.pubkey.toLowerCase();
+      const ids = channelsByPubkey.get(pubkey) ?? [];
+      ids.push(channel.id);
+      channelsByPubkey.set(pubkey, ids);
+    }
+  }
 
   return [...pubkeys]
     .map((pubkey): RelayAgent => {
       const event = latest.get(pubkey);
       let content: Record<string, unknown> = {};
       try {
-        content = event ? (JSON.parse(event.content) as Record<string, unknown>) : {};
+        const parsed: unknown = event ? JSON.parse(event.content) : {};
+        content =
+          parsed && typeof parsed === "object" && !Array.isArray(parsed)
+            ? (parsed as Record<string, unknown>)
+            : {};
       } catch {
         content = {};
       }
       const profile = profiles[pubkey];
-      const nameValue = content.display_name ?? content.name;
       const profileChannelIds = stringArray(content.channel_ids);
-      const membershipChannelIds = channels
-        .filter((channel) =>
-          channel.members.some(
-            (member) => member.pubkey.toLowerCase() === pubkey && member.role === "bot",
-          ),
-        )
-        .map((channel) => channel.id);
+      const membershipChannelIds = channelsByPubkey.get(pubkey) ?? [];
       return {
         pubkey,
         name:
-          (typeof nameValue === "string" && nameValue.trim()) ||
+          metadataDisplayName(content) ||
           configured.get(pubkey)?.name ||
           profileDisplayName(profile, pubkey, true),
         agentType:
