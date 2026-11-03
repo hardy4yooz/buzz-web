@@ -12,6 +12,7 @@ import {
   Plus,
   Search,
   Settings,
+  ShieldCheck,
   Star,
   UserRoundCog,
   UserRoundPlus,
@@ -77,6 +78,7 @@ export function AppNavigation({
   mobileOpen,
   canCreateChannel,
   canManageMembers,
+  canModerate,
   activeTool,
   inboxUnreadCount,
   channelUnreadCounts,
@@ -108,6 +110,7 @@ export function AppNavigation({
   mobileOpen: boolean;
   canCreateChannel: boolean;
   canManageMembers: boolean;
+  canModerate: boolean;
   activeTool: WorkspaceTool | null;
   inboxUnreadCount: number;
   channelUnreadCounts: Readonly<Record<string, number>>;
@@ -261,6 +264,18 @@ export function AppNavigation({
               >
                 <GitBranch className="h-[17px] w-[17px] shrink-0" />
                 <span>{t("nav.projects")}</span>
+              </button>
+            ) : null}
+            {canModerate ? (
+              <button
+                aria-label={t("nav.moderation")}
+                aria-pressed={activeTool === "moderation"}
+                className={navRow(activeTool === "moderation")}
+                type="button"
+                onClick={() => onToggleTool("moderation")}
+              >
+                <ShieldCheck className="h-[17px] w-[17px] shrink-0" />
+                <span>{t("nav.moderation")}</span>
               </button>
             ) : null}
             <button

@@ -21,6 +21,7 @@ agents, presence, and NIP-34 repository browsing.
 | Messaging | Channels, DMs, threads, reactions, mentions, search, uploads, edit/delete, isolated drafts, typing, presence, and NIP-RS read state | Relay authorization governs writes; encrypted read-state sync requires a NIP-44-capable signer |
 | Inbox | Mentions, DMs, thread replies, workflow approvals, filters, and Relay-backed unread state | Manual mark-unread overrides remain device-local because NIP-RS frontiers are monotonic |
 | Membership | Channel discovery, favorites, mute/archive, member directory, role changes, removal, Relay enrollment, and expiring invitations | Membership and moderation remain subject to Relay authorization |
+| Moderation | Read-only reports, audit log, and restricted-member views for community owners and admins | No moderation actions yet; the Relay enforces who may read the queue and which rows are returned |
 | Agents | Discover remote agents, inspect status, manage channel access, open DMs, optionally start a configured service | Local agent creation and full runtime configuration remain desktop features |
 | Projects | Browse NIP-34 announcements, refs, trees, files, commits, and clone URLs | Publishing, issues, pull requests, review, and merge are not implemented |
 

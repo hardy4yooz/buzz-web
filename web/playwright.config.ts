@@ -29,6 +29,13 @@ export default defineConfig({
       },
     },
     {
+      name: "moderation",
+      testMatch: ["**/moderation.spec.ts"],
+      use: {
+        ...devices["Desktop Chrome"],
+      },
+    },
+    {
       name: "notifications",
       testMatch: ["**/notifications.spec.ts"],
       use: {
