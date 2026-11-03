@@ -915,6 +915,7 @@ test("an offline agent play button starts its service without opening a DM", asy
 });
 
 test("Inbox filters unread activity and opens the source thread", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-11-03T09:00:00Z"));
   await enableDemo(page);
   await page.goto("/");
 

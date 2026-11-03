@@ -635,6 +635,10 @@ const messages = {
   "error.messageLoad": { en: "Failed to load messages.", "zh-CN": "消息加载失败。" },
   "error.messageSearch": { en: "Message search failed.", "zh-CN": "消息搜索失败。" },
   "error.messageSend": { en: "Failed to send message.", "zh-CN": "发送失败。" },
+  "error.repoAccessDenied": {
+    en: "Repository access is not available for this identity.",
+    "zh-CN": "此身份无法访问该仓库。",
+  },
   "error.repoContentsLoad": {
     en: "Failed to load repository contents",
     "zh-CN": "仓库内容加载失败",

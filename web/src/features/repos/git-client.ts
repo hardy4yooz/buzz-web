@@ -18,6 +18,7 @@ import LightningFS from "@isomorphic-git/lightning-fs";
 import { clone, fetch, log, readBlob, readTree, resolveRef } from "isomorphic-git";
 import http from "isomorphic-git/http/web";
 import { relayHttpOrigin } from "@/shared/config/runtime-config";
+import { t } from "@/shared/i18n";
 import { makeNip98AuthHeader } from "@/shared/lib/nip98";
 
 function relayCacheKey(relayUrl: string): string {
@@ -29,9 +30,35 @@ function relayCacheKey(relayUrl: string): string {
   return (hash >>> 0).toString(36);
 }
 
+/**
+ * Viewer-scoped IndexedDB name. Legacy `buzz-git-` names are never addressed,
+ * so an unattributed clone can never be adopted by a different identity.
+ */
+export function gitDbName(
+  relayUrl: string,
+  viewer: string,
+  owner: string,
+  repoName: string,
+): string {
+  if (!/^[0-9a-f]{64}$/.test(viewer)) {
+    throw new Error(t("error.repoAccessDenied"));
+  }
+  return `buzz-git-v2-${relayCacheKey(relayUrl)}-${viewer}-${owner}-${repoName}`;
+}
+
+/** Only a transport-level `TypeError` may reuse this viewer's cache. */
+export function classifyGitFetchFailure(error: unknown): "offline" | "deny" {
+  return error instanceof TypeError ? "offline" : "deny";
+}
+
 /** Get a repo-specific LightningFS instance backed by IndexedDB. */
-export function getFs(relayUrl: string, owner: string, repoName: string): LightningFS {
-  return new LightningFS(`buzz-git-${relayCacheKey(relayUrl)}-${owner}-${repoName}`);
+export function getFs(
+  relayUrl: string,
+  viewer: string,
+  owner: string,
+  repoName: string,
+): LightningFS {
+  return new LightningFS(gitDbName(relayUrl, viewer, owner, repoName));
 }
 
 /** Working directory inside the virtual FS. */
@@ -54,12 +81,27 @@ function repoAuthUrl(relayUrl: string, owner: string, repoName: string): string 
 
 async function authHeaders(
   relayUrl: string,
+  viewer: string,
   owner: string,
   repoName: string,
 ): Promise<Record<string, string>> {
-  return {
-    Authorization: await makeNip98AuthHeader(repoAuthUrl(relayUrl, owner, repoName), "GET"),
-  };
+  try {
+    const authorization = await makeNip98AuthHeader(repoAuthUrl(relayUrl, owner, repoName), "GET");
+    // The signer may switch identities while it awaits an extension provider, so
+    // bind the completed artifact to the viewer that owns the cache namespace.
+    const prefix = "Nostr ";
+    const event = JSON.parse(atob(authorization.slice(prefix.length))) as { pubkey?: unknown };
+    if (
+      authorization.startsWith(prefix) &&
+      typeof event.pubkey === "string" &&
+      event.pubkey === viewer
+    ) {
+      return { Authorization: authorization };
+    }
+  } catch {
+    // Malformed, failed, or mismatched signatures all fall through to denial.
+  }
+  throw new Error(t("error.repoAccessDenied"));
 }
 
 /**
@@ -68,14 +110,15 @@ async function authHeaders(
  */
 export async function ensureClone(
   relayUrl: string,
+  viewer: string,
   owner: string,
   repoName: string,
   ref: string,
 ): Promise<{ fs: LightningFS; dir: string }> {
-  const fs = getFs(relayUrl, owner, repoName);
+  const fs = getFs(relayUrl, viewer, owner, repoName);
   const dir = getDir(owner, repoName);
   const url = repoGitUrl(relayUrl, owner, repoName);
-  const headers = await authHeaders(relayUrl, owner, repoName);
+  const headers = await authHeaders(relayUrl, viewer, owner, repoName);
 
   let exists = false;
   try {
@@ -97,21 +140,27 @@ export async function ensureClone(
         singleBranch: true,
         headers,
       });
-    } catch {
-      // fetch may fail if ref hasn't changed — that's fine
+    } catch (error) {
+      if (classifyGitFetchFailure(error) === "deny") {
+        throw new Error(t("error.repoAccessDenied"));
+      }
     }
   } else {
-    await clone({
-      fs,
-      http,
-      dir,
-      url,
-      ref,
-      depth: 1,
-      singleBranch: true,
-      noTags: true,
-      headers,
-    });
+    try {
+      await clone({
+        fs,
+        http,
+        dir,
+        url,
+        ref,
+        depth: 1,
+        singleBranch: true,
+        noTags: true,
+        headers,
+      });
+    } catch {
+      throw new Error(t("error.repoAccessDenied"));
+    }
   }
 
   return { fs, dir };

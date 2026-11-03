@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { type NostrEvent, queryEvents } from "@/shared/lib/nostr-client";
+import { getActiveSignerPubkey } from "@/shared/lib/nostr-signer";
 import { dedup } from "./use-repos";
 
 export interface RepoRefs {
@@ -67,11 +68,15 @@ export function useRepoRefs(
     tags: ["v0.1.0"],
     head: { ref: "main", sha: "a".repeat(40) },
   };
+  const viewer = getActiveSignerPubkey();
 
   return useQuery({
-    queryKey: preview ? ["repo-refs", "mock", repoId] : ["repo-refs", relayUrl, repoId],
+    queryKey: preview
+      ? ["repo-refs", "mock", repoId]
+      : ["repo-refs", relayUrl, viewer ?? "", repoId],
     queryFn: preview ? async () => mockRefs : () => fetchRepoRefs(relayUrl, repoId),
     initialData: preview ? mockRefs : undefined,
+    enabled: preview || !!viewer,
     staleTime: 60_000,
   });
 }

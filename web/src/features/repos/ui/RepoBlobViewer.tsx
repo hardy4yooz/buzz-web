@@ -292,7 +292,11 @@ export function RepoBlobPage({ relayUrl }: { relayUrl: string }) {
         {ctxLoading || isLoading ? (
           <div className="h-32 animate-pulse rounded-lg bg-black/10 dark:bg-white/10" />
         ) : error ? (
-          <p className="text-sm text-destructive">
+          <p
+            aria-atomic="true"
+            className="rounded-md border border-destructive/50 bg-background px-4 py-3 text-sm text-destructive"
+            role="alert"
+          >
             {t("error.repoFileLoad")}: {(error as Error).message}
           </p>
         ) : view ? (

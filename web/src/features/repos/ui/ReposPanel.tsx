@@ -177,7 +177,11 @@ function RepoDetail({
           </div>
 
           {browseError ? (
-            <div className="mt-5 rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <div
+              aria-atomic="true"
+              className="mt-5 rounded-md border border-destructive/50 bg-background px-4 py-3 text-sm text-destructive"
+              role="alert"
+            >
               {t("error.repoContentsLoad")}: {browseError.message}
             </div>
           ) : null}
