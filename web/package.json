@@ -10,6 +10,7 @@
     "check:file-sizes": "node ./scripts/check-file-sizes.mjs",
     "check:i18n": "node ./scripts/check-i18n.mjs",
     "check:pubkey-truncation": "node ./scripts/check-pubkey-truncation.mjs",
+    "check:caddy": "node ./scripts/check-caddy.mjs",
     "lint": "biome lint .",
     "check": "biome check . && npm run check:file-sizes && npm run check:i18n && npm run check:pubkey-truncation",
     "format": "biome format --write .",
