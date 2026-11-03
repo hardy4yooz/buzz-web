@@ -1,6 +1,8 @@
 import { makeNip98AuthHeader } from "@/shared/lib/nip98";
 
-const START_TIMEOUT_MS = 20_000;
+// The control service can spend 5s + 15s + 5s on is-active/start/is-active before responding.
+// The remaining 10s of headroom also covers an operator proxy in front of the control service.
+const START_TIMEOUT_MS = 35_000;
 
 export async function startRelayAgent(controlUrl: string, pubkey: string): Promise<void> {
   const url = `${controlUrl.replace(/\/$/, "")}/start`;
