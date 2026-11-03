@@ -16,6 +16,7 @@ import {
   Star,
   UserRoundCog,
   UserRoundPlus,
+  Workflow,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -81,6 +82,7 @@ export function AppNavigation({
   canModerate,
   activeTool,
   inboxUnreadCount,
+  showWorkflows,
   channelUnreadCounts,
   starredChannelIds,
   mutedChannelIds,
@@ -113,6 +115,7 @@ export function AppNavigation({
   canModerate: boolean;
   activeTool: WorkspaceTool | null;
   inboxUnreadCount: number;
+  showWorkflows: boolean;
   channelUnreadCounts: Readonly<Record<string, number>>;
   features: RelayFeatureState;
   maximumWidth: number;
@@ -264,6 +267,18 @@ export function AppNavigation({
               >
                 <GitBranch className="h-[17px] w-[17px] shrink-0" />
                 <span>{t("nav.projects")}</span>
+              </button>
+            ) : null}
+            {showWorkflows ? (
+              <button
+                aria-label={t("nav.workflows")}
+                aria-pressed={activeTool === "workflows"}
+                className={navRow(activeTool === "workflows")}
+                type="button"
+                onClick={() => onToggleTool("workflows")}
+              >
+                <Workflow className="h-[17px] w-[17px] shrink-0" />
+                <span>{t("nav.workflows")}</span>
               </button>
             ) : null}
             {canModerate ? (

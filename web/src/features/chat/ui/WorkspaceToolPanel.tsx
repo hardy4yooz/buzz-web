@@ -1,7 +1,14 @@
 import type { ReactNode } from "react";
 import { t } from "@/shared/i18n";
 
-export type WorkspaceTool = "agents" | "inbox" | "moderation" | "new-dm" | "repos" | "settings";
+export type WorkspaceTool =
+  | "agents"
+  | "inbox"
+  | "moderation"
+  | "new-dm"
+  | "repos"
+  | "settings"
+  | "workflows";
 
 export function WorkspaceToolPanel({
   tool,

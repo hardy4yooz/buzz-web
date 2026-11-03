@@ -36,6 +36,13 @@ export default defineConfig({
       },
     },
     {
+      name: "workflows",
+      testMatch: ["**/workflows.spec.ts"],
+      use: {
+        ...devices["Desktop Chrome"],
+      },
+    },
+    {
       name: "notifications",
       testMatch: ["**/notifications.spec.ts"],
       use: {

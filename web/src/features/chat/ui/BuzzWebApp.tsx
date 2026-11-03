@@ -43,6 +43,13 @@ import { ModerationView } from "@/features/moderation/ui/ModerationView";
 import { useForegroundNotifications } from "@/features/notifications/use-foreground-notifications";
 import { useNotificationClicks } from "@/features/notifications/use-notification-clicks";
 import { ReposPanel } from "@/features/repos/ui/ReposPanel";
+import { WorkflowsView } from "@/features/workflows/ui/WorkflowsView";
+import {
+  WORKFLOW_DEFINITION_KIND,
+  type WorkflowGate,
+  workflowGateAfterProbe,
+  workflowRowVisible,
+} from "@/features/workflows/workflow-api";
 import { clearMediaObjectUrls } from "@/shared/api/media-client";
 import { BuzzRelayClient } from "@/shared/api/relay-client";
 import { loadRuntimeConfig, type RuntimeConfig } from "@/shared/config/runtime-config";
@@ -90,6 +97,7 @@ function Workspace({
   );
   const [insertMention, setInsertMention] = useState<string | null>(null);
   const [relayHasProjects, setRelayHasProjects] = useState(false);
+  const [workflowGate, setWorkflowGate] = useState<WorkflowGate>("checking");
   const [archiveTarget, setArchiveTarget] = useState<BuzzChannel | null>(null);
   const [editTarget, setEditTarget] = useState<TimelineMessage | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TimelineMessage | null>(null);
@@ -219,6 +227,32 @@ function Workspace({
       cancelled = true;
     };
   }, [client, config.features.projects, connected, demo]);
+
+  // A workflow definition the viewer can read is the only evidence that the
+  // Relay hosts workflows; without one the tool would have nothing to show.
+  // Re-probe on every (re)connect so a failed or stale probe cannot hide a
+  // shipped feature for the rest of the session.
+  useEffect(() => {
+    if (!client || demo) return;
+    let cancelled = false;
+    const probe = () => {
+      void client
+        .query({ kinds: [WORKFLOW_DEFINITION_KIND], limit: 1 })
+        .then((events) => {
+          if (!cancelled) setWorkflowGate(workflowGateAfterProbe(events.length));
+        })
+        .catch(() => {
+          if (!cancelled) setWorkflowGate(workflowGateAfterProbe(null));
+        });
+    };
+    const unsubscribe = client.onStateChange((connectionState) => {
+      if (connectionState === "connected") probe();
+    });
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [client, demo]);
 
   useEffect(() => {
     if (userState.syncError) toast.error(userState.syncError);
@@ -478,6 +512,7 @@ function Workspace({
         presence={state.presence}
         relayUrl={config.relayUrl}
         selectedChannelId={state.selectedChannelId}
+        showWorkflows={workflowRowVisible(workflowGate)}
         onCloseMobile={() => setMobileNavigationOpen(false)}
         onBrowseChannels={() => openChannelBrowser()}
         onInvite={() => setDialog("invite")}
@@ -654,6 +689,13 @@ function Workspace({
               <ModerationView
                 relayUrl={config.relayUrl}
                 role={state.communityRole}
+                viewerPubkey={pubkey}
+                onClose={() => setActiveTool(null)}
+              />
+            ) : activeTool === "workflows" ? (
+              <WorkflowsView
+                channels={state.channels}
+                relayUrl={config.relayUrl}
                 viewerPubkey={pubkey}
                 onClose={() => setActiveTool(null)}
               />

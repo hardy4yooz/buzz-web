@@ -110,14 +110,18 @@ Team、响应策略和生命周期状态。
 
 ### Workflow 编辑和运行
 
-**目标：** 增加 Workflow 列表、编辑、Trigger、Run/Step 详情、Schedule 和 Webhook；
-现有 Inbox 审批继续作为第一类操作入口。
+**只读运行历史（已实现）。** 成员可以打开「工作流」，列出可读频道中的 `kind:30620` 定义，
+并查看所选定义的运行记录。列表通过 `GET /workflows/{id}/runs` 按需获取；Relay 不发布
+工作流执行事件，因此运行状态不是实时的。客户端既不读取也不展示审批：`approval_ref`
+是一种 bearer 能力，审批门在上游尚未实现（WF-08），请求审批的运行会失败而不是等待。
+
+**目标：** 增加 Workflow 编辑、Trigger、更深入的 Run/Step 详情、Schedule 和 Webhook。
 
 **验收标准：**
 
 - 发布前验证 Workflow 定义。
-- Run 状态实时更新，并可追踪到触发事件。
-- Webhook 密钥不会返回或持久化到浏览器。
+- 运行历史按需读取；实时运行状态仍属于上游工作，因为 Relay 不发布工作流事件。
+- 浏览器绝不会读取、渲染或存储审批能力或 Webhook 密钥。
 
 ## P3：平台能力
 
