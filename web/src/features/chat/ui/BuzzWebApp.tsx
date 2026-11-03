@@ -48,12 +48,8 @@ import { useForegroundNotifications } from "@/features/notifications/use-foregro
 import { useNotificationClicks } from "@/features/notifications/use-notification-clicks";
 import { ReposPanel } from "@/features/repos/ui/ReposPanel";
 import { WorkflowsView } from "@/features/workflows/ui/WorkflowsView";
-import {
-  WORKFLOW_DEFINITION_KIND,
-  type WorkflowGate,
-  workflowGateAfterProbe,
-  workflowRowVisible,
-} from "@/features/workflows/workflow-api";
+import { useWorkflowGate } from "@/features/workflows/use-workflows";
+import { workflowRowVisible } from "@/features/workflows/workflow-api";
 import { clearMediaObjectUrls } from "@/shared/api/media-client";
 import { BuzzRelayClient } from "@/shared/api/relay-client";
 import { loadRuntimeConfig, type RuntimeConfig } from "@/shared/config/runtime-config";
@@ -101,7 +97,6 @@ function Workspace({
   );
   const [insertMention, setInsertMention] = useState<string | null>(null);
   const [relayHasProjects, setRelayHasProjects] = useState(false);
-  const [workflowGate, setWorkflowGate] = useState<WorkflowGate>("checking");
   const [archiveTarget, setArchiveTarget] = useState<BuzzChannel | null>(null);
   const [editTarget, setEditTarget] = useState<TimelineMessage | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TimelineMessage | null>(null);
@@ -235,30 +230,8 @@ function Workspace({
   }, [client, config.features.projects, connected, demo]);
 
   // A workflow definition the viewer can read is the only evidence that the
-  // Relay hosts workflows; without one the tool would have nothing to show.
-  // Re-probe on every (re)connect so a failed or stale probe cannot hide a
-  // shipped feature for the rest of the session.
-  useEffect(() => {
-    if (!client || demo) return;
-    let cancelled = false;
-    const probe = () => {
-      void client
-        .query({ kinds: [WORKFLOW_DEFINITION_KIND], limit: 1 })
-        .then((events) => {
-          if (!cancelled) setWorkflowGate(workflowGateAfterProbe(events.length));
-        })
-        .catch(() => {
-          if (!cancelled) setWorkflowGate(workflowGateAfterProbe(null));
-        });
-    };
-    const unsubscribe = client.onStateChange((connectionState) => {
-      if (connectionState === "connected") probe();
-    });
-    return () => {
-      cancelled = true;
-      unsubscribe();
-    };
-  }, [client, demo]);
+  // Relay hosts workflows; the gate also follows definitions published mid-session.
+  const workflowGate = useWorkflowGate({ client, connected, demo });
 
   useEffect(() => {
     if (userState.syncError) toast.error(userState.syncError);

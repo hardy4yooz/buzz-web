@@ -1,4 +1,12 @@
-import { AlertTriangle, ChevronDown, LoaderCircle, RefreshCw, Workflow, X } from "lucide-react";
+import {
+  AlertTriangle,
+  ChevronDown,
+  Info,
+  LoaderCircle,
+  RefreshCw,
+  Workflow,
+  X,
+} from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { BuzzChannel } from "@/features/chat/lib/chat-types";
 import { useWorkflowDefinitions, useWorkflowRuns } from "@/features/workflows/use-workflows";
@@ -295,7 +303,20 @@ export function WorkflowsView({
                 </p>
               ) : (
                 <>
-                  {view.dropped > 0 ? <Notice message={t("workflows.someRunsUnreadable")} /> : null}
+                  {view.dropped > 0 ? (
+                    // Informational, not an error: the rows that could be read are
+                    // shown above, so this must not wear the destructive surface.
+                    <div
+                      aria-live="polite"
+                      className="mt-3 flex flex-wrap items-center gap-2.5 rounded-md bg-muted px-3 py-2 text-xs text-foreground ring-1 ring-border"
+                      role="status"
+                    >
+                      <Info aria-hidden="true" className="h-4 w-4 shrink-0" />
+                      <span className="min-w-0 flex-1 break-words">
+                        {t("workflows.someRunsUnreadable")}
+                      </span>
+                    </div>
+                  ) : null}
                   <ul aria-live="polite" className="mt-3 space-y-2">
                     {view.runs.map((run, index) => (
                       <RunRow

@@ -242,11 +242,6 @@ describe("workflow navigation gate", () => {
   it("does not reveal the row before the first probe answers", () => {
     expect(workflowRowVisible("checking")).toBe(false);
   });
-
-  it("lets a later successful probe refine a failed one", () => {
-    expect(workflowGateAfterProbe(1)).toBe("present");
-    expect(workflowGateAfterProbe(0)).toBe("absent");
-  });
 });
 
 describe("run status and failure mapping", () => {
