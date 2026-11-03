@@ -462,7 +462,7 @@ test.describe("open-tab notifications", () => {
     expect(await showCount(context)).toBe(0);
 
     // An eligible event that arrives now notifies exactly once.
-    const first = mention("3", now + 5);
+    const first = mention("3", Math.floor(Date.now() / 1_000) + 1);
     relay.push(first);
     await expect.poll(() => shownNotifications(page).then((list) => list.length)).toBe(1);
     const [notification] = await shownNotifications(page);
@@ -473,7 +473,7 @@ test.describe("open-tab notifications", () => {
       eventId: first.id,
       channelId: CHANNEL,
       category: "mention",
-      createdAt: now + 5,
+      createdAt: first.created_at,
     });
     expect(notification.title).toBe("Buzz Community");
     expect(notification.body).toBe("New activity in Buzz");
@@ -486,7 +486,7 @@ test.describe("open-tab notifications", () => {
     expect(await shownNotifications(page)).toHaveLength(1);
     expect(await showCount(context)).toBe(1);
 
-    const newer = mention("4", now + 10);
+    const newer = mention("4", first.created_at + 1);
     relay.push(newer);
     await expect
       .poll(() => shownNotifications(page).then((list) => list[0]?.data?.eventId))
@@ -518,7 +518,6 @@ test.describe("open-tab notifications", () => {
 
   test("two hidden tabs produce one notification for one event", async ({ context, page }) => {
     const relay = new FakeRelay();
-    const now = Math.floor(Date.now() / 1_000);
     await relay.install(context);
     await useConfig(page);
     await hideTab(page);
@@ -538,7 +537,7 @@ test.describe("open-tab notifications", () => {
     await expect(secondSection).toHaveAttribute("data-notify-state", "ready");
 
     await patchShowCounter(context);
-    relay.push(mention("5", now + 5, OTHER_CHANNEL));
+    relay.push(mention("5", Math.floor(Date.now() / 1_000) + 1, OTHER_CHANNEL));
     await expect.poll(() => shownNotifications(page).then((list) => list.length)).toBe(1);
     await page.waitForTimeout(1_500);
     expect(await showCount(context)).toBe(1);
@@ -567,7 +566,9 @@ test.describe("open-tab notifications", () => {
     await expect(siblingSection).toHaveAttribute("data-notify-state", "granted_off");
 
     // A mention arrives while notifications are off: pre-enablement history for the sibling.
-    relay.push(mention("7", Math.floor(Date.now() / 1_000) + 2));
+    // Created at push time, so it is <= the enable second; the strict watermark comparison keeps it
+    // silent.
+    relay.push(mention("7", Math.floor(Date.now() / 1_000)));
     await expect(sibling.getByTestId("inbox-unread-count")).toHaveText("1", { timeout: 15_000 });
 
     // Enabling in the first tab must re-arm the sibling instead of replaying that item.

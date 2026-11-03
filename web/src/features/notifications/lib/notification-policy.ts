@@ -76,6 +76,14 @@ export function createArming(now: number): NotificationArming {
 }
 
 /**
+ * Enable path: the watermark already excludes older history, so arm at once. Gating this on
+ * `loading` would fold events arriving during a re-load into `seenIds` and drop them for good.
+ */
+export function createEnabledArming(now: number): NotificationArming {
+  return { watermark: Math.floor(now / 1_000), seenIds: new Set(), armed: true };
+}
+
+/**
  * Seeds pre-existing history while the inbox is loading, then arms once. After arming the
  * watermark and seen set stay fixed so reconnects and refreshes cannot replay notifications.
  */

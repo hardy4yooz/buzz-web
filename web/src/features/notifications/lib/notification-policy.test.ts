@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { InboxCategory, InboxItem } from "@/features/inbox/lib/inbox-model";
 import {
   createArming,
+  createEnabledArming,
   isNotificationEligible,
   markNotificationSeen,
   type NotificationContext,
@@ -16,6 +17,7 @@ import {
   pendingTargetForScope,
 } from "@/features/notifications/lib/notification-policy";
 import type { NostrEvent } from "@/shared/api/nostr-types";
+import hookSource from "../use-foreground-notifications.ts?raw";
 
 const RELAY = "wss://relay.example.com";
 const PUBKEY = "a".repeat(64);
@@ -145,6 +147,20 @@ describe("isNotificationEligible", () => {
 });
 
 describe("arming", () => {
+  it("arms the enable path at once so an event during a re-load still notifies", () => {
+    const enabled = createEnabledArming(1_700_000_000_900);
+    expect(enabled).toEqual({ watermark: 1_700_000_000, seenIds: new Set(), armed: true });
+    // A re-load must not fold that event into seenIds, or the only chance to notify is lost.
+    expect(observeInbox(enabled, { loading: true, itemIds: ["history"] })).toBe(enabled);
+
+    const at = { armed: enabled.armed, watermark: enabled.watermark, seenIds: enabled.seenIds };
+    expect(isNotificationEligible(inboxItem({ createdAt: 1_700_000_001 }), context(at))).toBe(true);
+    // The click second itself is history: eligibility compares strictly newer than the watermark.
+    expect(isNotificationEligible(inboxItem({ createdAt: 1_700_000_000 }), context(at))).toBe(
+      false,
+    );
+  });
+
   it("seeds history seen while loading and arms without moving the watermark", () => {
     const armed = createArming(1_700_000_000_000);
     expect(armed).toEqual({ watermark: 1_700_000_000, seenIds: new Set(), armed: false });
@@ -251,5 +267,15 @@ describe("parseNotificationTarget", () => {
     for (const value of invalid) {
       expect(parseNotificationTarget(value), JSON.stringify(value)).toBeNull();
     }
+  });
+});
+
+describe("hook wiring", () => {
+  // No DOM harness exists in this suite, so the arming call sites are pinned structurally: both the
+  // enable click and the sibling storage re-arm must use the already-armed factory, otherwise a load
+  // in flight at that moment folds fresh events into `seenIds` and they are never notified.
+  it("arms both call sites without passing a fresh unarmed createArming to observeInbox", () => {
+    expect(hookSource).not.toMatch(/observeInbox\(\s*createArming/);
+    expect(hookSource.match(/createEnabledArming\(Date\.now\(\)\)/g)).toHaveLength(2);
   });
 });

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { InboxItem } from "@/features/inbox/lib/inbox-model";
 import {
   createArming,
+  createEnabledArming,
   isNotificationEligible,
   markNotificationSeen,
   type NotificationArming,
@@ -149,10 +150,6 @@ export function useForegroundNotifications({
   const [scopeId, setScopeId] = useState<string | null>(null);
   const armingRef = useRef<NotificationArming>(createArming(Date.now()));
   const workerRef = useRef<ServiceWorker | null>(null);
-  const itemsRef = useRef(items);
-  const loadingRef = useRef(loading);
-  itemsRef.current = items;
-  loadingRef.current = loading;
 
   useEffect(() => {
     let cancelled = false;
@@ -212,10 +209,8 @@ export function useForegroundNotifications({
       // A sibling turning the preference on starts a new watermark here too, otherwise every item
       // this tab missed while notifications were off would burst at once.
       if (event.newValue === "true") {
-        armingRef.current = observeInbox(createArming(Date.now()), {
-          loading: loadingRef.current,
-          itemIds: itemsRef.current.map((item) => item.id),
-        });
+        // Same contract as enable(): arm at once so a load in flight cannot fold fresh events away.
+        armingRef.current = createEnabledArming(Date.now());
       }
       setPreference(readPreference(preferenceKey));
     };
@@ -287,10 +282,8 @@ export function useForegroundNotifications({
           return;
         }
         writePreference(preferenceKey, true);
-        armingRef.current = observeInbox(createArming(Date.now()), {
-          loading: loadingRef.current,
-          itemIds: itemsRef.current.map((item) => item.id),
-        });
+        // The user asked for notifications now: arm immediately, never behind a load.
+        armingRef.current = createEnabledArming(Date.now());
         setPreference(true);
         await probeWorker();
       })
