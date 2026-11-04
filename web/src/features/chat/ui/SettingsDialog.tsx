@@ -1,27 +1,31 @@
 import {
   ArrowLeft,
+  Bell,
   Download,
   KeyRound,
   LoaderCircle,
   Monitor,
   Moon,
   Pencil,
+  RotateCw,
   Sun,
   UserRound,
   UserRoundPlus,
 } from "lucide-react";
 import { useState } from "react";
+import { isValidProfilePicture } from "@/features/chat/lib/chat-model";
 import type { UserProfile } from "@/features/chat/lib/chat-types";
 import { connectionStateLabel } from "@/features/chat/lib/connection-state";
 import { DialogFrame } from "@/features/chat/ui/AppDialogs";
 import { Avatar } from "@/features/chat/ui/Avatar";
+import type { NotificationController } from "@/features/notifications/use-foreground-notifications";
 import type { RelayConnectionState } from "@/shared/api/nostr-types";
 import { t } from "@/shared/i18n";
 import { downloadIdentityBackup } from "@/shared/lib/identity-backup";
 import { createActiveIdentityBackup, getActiveSignerMode } from "@/shared/lib/nostr-signer";
 import { useTheme } from "@/shared/theme/ThemeProvider";
 
-export type SettingsSection = "appearance" | "identity" | "invites" | "profile";
+export type SettingsSection = "appearance" | "identity" | "invites" | "notifications" | "profile";
 
 function ProfileEditor({
   profile,
@@ -37,6 +41,7 @@ function ProfileEditor({
   const [picture, setPicture] = useState(profile.picture ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const pictureInvalid = !isValidProfilePicture(picture);
   return (
     <DialogFrame title={t("settings.editProfile")} onClose={onClose}>
       <form
@@ -83,6 +88,11 @@ function ProfileEditor({
             onChange={(event) => setPicture(event.target.value)}
           />
         </label>
+        {pictureInvalid ? (
+          <p className="text-xs text-destructive" role="alert">
+            {t("error.profilePicture")}
+          </p>
+        ) : null}
         {error ? <p className="text-xs text-destructive">{error}</p> : null}
         <div className="flex justify-end gap-2 border-t pt-4">
           <button
@@ -94,7 +104,7 @@ function ProfileEditor({
           </button>
           <button
             className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-40"
-            disabled={!name.trim() || saving}
+            disabled={!name.trim() || pictureInvalid || saving}
             type="submit"
           >
             {saving ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
@@ -256,12 +266,74 @@ function IdentitySection({
   );
 }
 
+function NotificationsSection({ notifications }: { notifications: NotificationController }) {
+  const { state, enable, disable, retry } = notifications;
+  const hint =
+    state === "unsupported"
+      ? t("notify.unsupported")
+      : state === "blocked"
+        ? t("notify.blocked")
+        : state === "checking"
+          ? t("notify.checking")
+          : state === "unavailable"
+            ? t("notify.unavailable")
+            : state === "ready"
+              ? t("notify.on")
+              : t("notify.off");
+  const actionClass =
+    "inline-flex h-9 items-center gap-2 rounded-md border px-3 text-sm font-medium hover:bg-foreground/5 disabled:opacity-40";
+  return (
+    <div className="max-w-2xl">
+      <h2 className="text-xl font-semibold">{t("notify.title")}</h2>
+      <section
+        className="mt-6 border-y py-5"
+        data-notify-state={state}
+        data-testid="settings-notifications"
+      >
+        <p className="text-sm font-medium">{t("notify.description")}</p>
+        <p className="mt-2 text-xs text-muted-foreground">{hint}</p>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          {state === "ready" ? (
+            <button className={actionClass} type="button" onClick={disable}>
+              {t("notify.turnOff")}
+            </button>
+          ) : null}
+          {state === "off" || state === "granted_off" ? (
+            <button className={actionClass} type="button" onClick={enable}>
+              {state === "off" ? t("notify.enable") : t("notify.turnOn")}
+            </button>
+          ) : null}
+          {state === "unavailable" ? (
+            <button className={actionClass} type="button" onClick={retry}>
+              <RotateCw className="h-3.5 w-3.5" />
+              {t("notify.retry")}
+            </button>
+          ) : null}
+          {state === "blocked" ? (
+            <button className={actionClass} disabled type="button">
+              {t("notify.enable")}
+            </button>
+          ) : null}
+          {state === "checking" ? (
+            <button className={actionClass} disabled type="button">
+              <LoaderCircle className="h-4 w-4 animate-spin" />
+              {t("notify.checking")}
+            </button>
+          ) : null}
+        </div>
+        <p className="mt-4 text-xs leading-5 text-muted-foreground">{t("notify.privacy")}</p>
+      </section>
+    </div>
+  );
+}
+
 export function SettingsView({
   relayUrl,
   pubkey,
   profile,
   connectionState,
   canInvite,
+  notifications,
   onClose,
   onOpenInvites,
   onSwitchIdentity,
@@ -272,6 +344,7 @@ export function SettingsView({
   profile: UserProfile;
   connectionState: RelayConnectionState;
   canInvite: boolean;
+  notifications: NotificationController;
   onClose: () => void;
   onOpenInvites: () => void;
   onSwitchIdentity: () => void;
@@ -281,6 +354,7 @@ export function SettingsView({
   const [editingProfile, setEditingProfile] = useState(false);
   const sections = [
     { id: "profile", label: t("profile.title"), icon: UserRound },
+    { id: "notifications", label: t("notify.title"), icon: Bell },
     { id: "appearance", label: t("dialog.appearance"), icon: Monitor },
     { id: "invites", label: t("settings.invites"), icon: UserRoundPlus },
     { id: "identity", label: t("settings.identity"), icon: KeyRound },
@@ -342,6 +416,8 @@ export function SettingsView({
               </button>
             </div>
           </div>
+        ) : section === "notifications" ? (
+          <NotificationsSection notifications={notifications} />
         ) : section === "appearance" ? (
           <AppearanceSection />
         ) : section === "invites" ? (

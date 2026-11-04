@@ -8,12 +8,14 @@ export function NewDmView({
   profiles,
   currentPubkey,
   relayUrl,
+  connected,
   onClose,
   onOpen,
 }: {
   profiles: Record<string, UserProfile>;
   currentPubkey: string;
   relayUrl: string;
+  connected: boolean;
   onClose: () => void;
   onOpen: (pubkey: string) => Promise<void>;
 }) {
@@ -105,7 +107,9 @@ export function NewDmView({
           {!options.length ? (
             <div className="flex flex-col items-center py-16 text-center text-muted-foreground">
               <UserRound className="h-7 w-7 opacity-55" />
-              <p className="mt-3 text-sm">{t("dm.empty")}</p>
+              <p className="mt-3 text-sm">
+                {connected ? t("dm.empty") : t("error.relayUnavailable")}
+              </p>
             </div>
           ) : null}
         </div>

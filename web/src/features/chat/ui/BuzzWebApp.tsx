@@ -4,7 +4,11 @@ import { toast } from "sonner";
 import buzzAppIcon from "@/assets/app-icon@3x.png";
 import { AgentsView } from "@/features/agents/ui/AgentsView";
 import { useRelayAgents } from "@/features/agents/use-relay-agents";
-import { channelDisplayName, threadReference } from "@/features/chat/lib/chat-model";
+import {
+  channelDisplayName,
+  fallbackProfile,
+  threadReference,
+} from "@/features/chat/lib/chat-model";
 import type { BuzzChannel, TimelineMessage } from "@/features/chat/lib/chat-types";
 import { conversationDraftKey } from "@/features/chat/lib/conversation-drafts";
 import { useBuzzSession } from "@/features/chat/lib/use-buzz-session";
@@ -39,7 +43,13 @@ import { CommunityInviteDialog } from "@/features/community/ui/CommunityInviteDi
 import type { InboxItem } from "@/features/inbox/lib/inbox-model";
 import { InboxView } from "@/features/inbox/ui/InboxView";
 import { useInbox } from "@/features/inbox/use-inbox";
+import { ModerationView } from "@/features/moderation/ui/ModerationView";
+import { useForegroundNotifications } from "@/features/notifications/use-foreground-notifications";
+import { useNotificationClicks } from "@/features/notifications/use-notification-clicks";
 import { ReposPanel } from "@/features/repos/ui/ReposPanel";
+import { WorkflowsView } from "@/features/workflows/ui/WorkflowsView";
+import { useWorkflowGate } from "@/features/workflows/use-workflows";
+import { workflowRowVisible } from "@/features/workflows/workflow-api";
 import { clearMediaObjectUrls } from "@/shared/api/media-client";
 import { BuzzRelayClient } from "@/shared/api/relay-client";
 import { loadRuntimeConfig, type RuntimeConfig } from "@/shared/config/runtime-config";
@@ -136,15 +146,24 @@ function Workspace({
     readContexts: userState.contexts,
     markContextRead: userState.markContextRead,
   });
+  const notifications = useForegroundNotifications({
+    relayUrl: config.relayUrl,
+    pubkey,
+    communityName: config.communityName,
+    items: inbox.items,
+    loading: inbox.loading,
+  });
   const threadRoot = state.messages.find((message) => message.event.id === threadRootId) ?? null;
   const threadReplyTarget =
     state.messages.find((message) => message.event.id === threadReplyTargetId) ?? null;
-  const canCreateChannel = state.communityRole === "owner" || state.communityRole === "admin";
+  const canManageCommunity = state.communityRole === "owner" || state.communityRole === "admin";
   const selectedRole = selectedChannel?.members.find(
     (member) => member.pubkey.toLowerCase() === pubkey.toLowerCase(),
   )?.role;
-  const canManageChannel = canCreateChannel || selectedRole === "owner" || selectedRole === "admin";
   const connected = state.connectionState === "connected";
+  const canCreateChannel = connected;
+  const canManageChannel =
+    canManageCommunity || selectedRole === "owner" || selectedRole === "admin";
   const features = resolveRelayFeatures(config.features, {
     projects: relayHasProjects,
     forum: state.channels.some((channel) => channel.type === "forum"),
@@ -209,6 +228,10 @@ function Workspace({
       cancelled = true;
     };
   }, [client, config.features.projects, connected, demo]);
+
+  // A workflow definition the viewer can read is the only evidence that the
+  // Relay hosts workflows; the gate also follows definitions published mid-session.
+  const workflowGate = useWorkflowGate({ client, connected, demo });
 
   useEffect(() => {
     if (userState.syncError) toast.error(userState.syncError);
@@ -290,6 +313,13 @@ function Workspace({
     setFocusedMessageId(eventId);
     session.revealMessage({ channelId, eventId, threadRootId: threadId });
   };
+  useNotificationClicks({
+    scopeId: notifications.scopeId,
+    channelsLoaded: !state.loadingChannels,
+    hasChannel: (channelId) => state.channels.some((channel) => channel.id === channelId),
+    openInbox: () => setActiveTool("inbox"),
+    openMessage: revealMessage,
+  });
   const openInboxConversation = (item: InboxItem) => {
     if (!item.channelId) return;
     revealMessage(item.channelId, item.event.id, item.threadRootId);
@@ -445,7 +475,8 @@ function Workspace({
       <AppNavigation
         activeTool={activeTool}
         canCreateChannel={canCreateChannel}
-        canManageMembers={canCreateChannel}
+        canManageMembers={canManageCommunity}
+        canModerate={canManageCommunity && !demo}
         channels={state.channels}
         communityName={config.communityName}
         connectionState={state.connectionState}
@@ -460,6 +491,7 @@ function Workspace({
         presence={state.presence}
         relayUrl={config.relayUrl}
         selectedChannelId={state.selectedChannelId}
+        showWorkflows={workflowRowVisible(workflowGate)}
         onCloseMobile={() => setMobileNavigationOpen(false)}
         onBrowseChannels={() => openChannelBrowser()}
         onInvite={() => setDialog("invite")}
@@ -617,6 +649,7 @@ function Workspace({
               <InboxView
                 approvalPending={inbox.approvalPending}
                 channels={state.channels}
+                connected={connected}
                 error={inbox.error}
                 items={inbox.items}
                 loading={inbox.loading}
@@ -632,8 +665,23 @@ function Workspace({
                   inbox.respondToApproval(item.event, approved)
                 }
               />
+            ) : activeTool === "moderation" ? (
+              <ModerationView
+                relayUrl={config.relayUrl}
+                role={state.communityRole}
+                viewerPubkey={pubkey}
+                onClose={() => setActiveTool(null)}
+              />
+            ) : activeTool === "workflows" ? (
+              <WorkflowsView
+                channels={state.channels}
+                relayUrl={config.relayUrl}
+                viewerPubkey={pubkey}
+                onClose={() => setActiveTool(null)}
+              />
             ) : activeTool === "new-dm" ? (
               <NewDmView
+                connected={connected}
                 currentPubkey={pubkey}
                 profiles={state.profiles}
                 relayUrl={config.relayUrl}
@@ -650,17 +698,10 @@ function Workspace({
               />
             ) : activeTool === "settings" ? (
               <SettingsView
-                canInvite={canCreateChannel}
+                canInvite={canManageCommunity}
                 connectionState={state.connectionState}
-                profile={
-                  state.profiles[pubkey] ?? {
-                    pubkey,
-                    name: pubkey.slice(0, 12),
-                    about: "",
-                    picture: null,
-                    isAgent: false,
-                  }
-                }
+                notifications={notifications}
+                profile={state.profiles[pubkey] ?? fallbackProfile(pubkey)}
                 pubkey={pubkey}
                 relayUrl={config.relayUrl}
                 onClose={() => setActiveTool(null)}
@@ -764,6 +805,7 @@ function Workspace({
           allowForum={features.forum}
           canCreate={canCreateChannel}
           channels={session.discoveredChannels}
+          connected={connected}
           currentPubkey={pubkey}
           initialView={channelBrowserInitialView}
           onClose={() => setDialog(null)}
@@ -776,6 +818,7 @@ function Workspace({
       {dialog === "search" ? (
         <SearchDialog
           channels={state.channels}
+          connected={connected}
           profiles={state.profiles}
           onClose={() => setDialog(null)}
           onSearch={session.search}

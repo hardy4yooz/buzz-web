@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { type NostrEvent, queryEvents } from "@/shared/lib/nostr-client";
+import { getActiveSignerPubkey } from "@/shared/lib/nostr-signer";
 import { mockRepos } from "./mock-repos";
 
 export interface Repo {
@@ -69,10 +70,12 @@ async function fetchRepos(relayUrl: string): Promise<Repo[]> {
 }
 
 export function useRepos({ relayUrl, enabled = true }: { relayUrl: string; enabled?: boolean }) {
+  const viewer = getActiveSignerPubkey();
+
   return useQuery({
-    queryKey: ["repos", relayUrl],
+    queryKey: ["repos", relayUrl, viewer ?? ""],
     queryFn: () => fetchRepos(relayUrl),
-    enabled,
+    enabled: enabled && !!viewer,
     staleTime: 60_000,
   });
 }
@@ -81,10 +84,13 @@ export function useRepo(
   repoId: string,
   { relayUrl, preview = false }: { relayUrl: string; preview?: boolean },
 ) {
+  const viewer = getActiveSignerPubkey();
+
   return useQuery({
-    queryKey: preview ? ["repos", "mock"] : ["repos", relayUrl],
+    queryKey: preview ? ["repos", "mock"] : ["repos", relayUrl, viewer ?? ""],
     queryFn: preview ? async () => mockRepos : () => fetchRepos(relayUrl),
     initialData: preview ? mockRepos : undefined,
+    enabled: preview || !!viewer,
     staleTime: 60_000,
     select: (repos) => repos.find((r) => r.id === repoId),
   });

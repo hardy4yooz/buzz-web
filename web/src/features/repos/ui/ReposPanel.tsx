@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { fallbackProfile } from "@/features/chat/lib/chat-model";
 import type { UserProfile } from "@/features/chat/lib/chat-types";
 import { Avatar } from "@/features/chat/ui/Avatar";
 import {
@@ -26,10 +27,12 @@ import {
   mockRepoTree,
 } from "@/features/repos/mock-repos";
 import { useGitLog, useGitReadme, useGitTree } from "@/features/repos/use-git-browse";
+import { activityCount, useRepoActivity } from "@/features/repos/use-repo-activity";
 import { useRepoRefs } from "@/features/repos/use-repo-refs";
 import { type Repo, useRepos } from "@/features/repos/use-repos";
 import { getLocale, t } from "@/shared/i18n";
 import { truncatePubkey } from "@/shared/lib/pubkey";
+import { RepoActivitySection } from "./RepoActivitySection";
 import { RepoContentTabs } from "./RepoContentTabs";
 import { RepoRefsSection } from "./RepoRefsSection";
 
@@ -58,16 +61,6 @@ function safeWebUrl(value: string | null): string | null {
   } catch {
     return null;
   }
-}
-
-function fallbackProfile(pubkey: string): UserProfile {
-  return {
-    pubkey,
-    name: truncatePubkey(pubkey),
-    about: "",
-    picture: null,
-    isAgent: false,
-  };
 }
 
 function contributionData(repos: readonly Repo[]) {
@@ -177,7 +170,11 @@ function RepoDetail({
           </div>
 
           {browseError ? (
-            <div className="mt-5 rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <div
+              aria-atomic="true"
+              className="mt-5 rounded-md border border-destructive/50 bg-background px-4 py-3 text-sm text-destructive"
+              role="alert"
+            >
               {t("error.repoContentsLoad")}: {browseError.message}
             </div>
           ) : null}
@@ -278,15 +275,33 @@ function RepoDetail({
   );
 }
 
-function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
+function StatCard({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number | null;
+}) {
   return (
-    <div className="min-h-[112px] rounded-lg border bg-background/30 p-4">
+    <fieldset
+      aria-label={label}
+      className="min-h-[112px] min-w-0 rounded-lg border bg-background/30 p-4"
+    >
       <div className="flex items-center justify-between gap-3 text-xs font-medium">
         <span>{label}</span>
         <span className="text-muted-foreground">{icon}</span>
       </div>
-      <div className="mt-4 text-4xl font-semibold leading-none">{value}</div>
-    </div>
+      <div className="mt-4 text-4xl font-semibold leading-none">
+        {value ?? (
+          <>
+            <span aria-hidden="true">—</span>
+            <span className="sr-only">{t("repos.activityUnknown")}</span>
+          </>
+        )}
+      </div>
+    </fieldset>
   );
 }
 
@@ -305,6 +320,7 @@ export function ReposPanel({
 }) {
   const query = useRepos({ relayUrl, enabled: !demo });
   const repos = demo ? mockRepos : (query.data ?? []);
+  const activity = useRepoActivity({ relayUrl, repos, enabled: !demo });
   const [activeTab, setActiveTab] = useState<ProjectTab>("overview");
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortOrder>("newest");
@@ -425,13 +441,19 @@ export function ReposPanel({
               <StatCard
                 icon={<GitPullRequest className="h-4 w-4" />}
                 label={t("repos.pullRequests")}
-                value={0}
+                value={
+                  activity.data
+                    ? activityCount(activity.data.pullRequests, activity.data.complete)
+                    : null
+                }
               />
               <StatCard icon={<Radio className="h-4 w-4" />} label={t("repos.local")} value={0} />
               <StatCard
                 icon={<CircleDot className="h-4 w-4" />}
                 label={t("repos.issues")}
-                value={0}
+                value={
+                  activity.data ? activityCount(activity.data.issues, activity.data.complete) : null
+                }
               />
             </div>
 
@@ -594,16 +616,14 @@ export function ReposPanel({
             ) : null}
           </div>
         ) : (
-          <div className="flex min-h-[360px] flex-col items-center justify-center text-center text-muted-foreground">
-            {activeTab === "pull-requests" ? (
-              <GitPullRequest className="h-9 w-9 opacity-45" />
-            ) : (
-              <CircleDot className="h-9 w-9 opacity-45" />
-            )}
-            <p className="mt-3 text-sm">
-              {activeTab === "pull-requests" ? t("repos.noPullRequests") : t("repos.noIssues")}
-            </p>
-          </div>
+          <RepoActivitySection
+            activity={activity.data}
+            error={activity.error ?? null}
+            isLoading={activity.isLoading || query.isLoading}
+            kind={activeTab === "pull-requests" ? "pull-requests" : "issues"}
+            onOpenRepo={openRepo}
+            onRetry={() => void activity.refetch()}
+          />
         )}
       </div>
     </div>

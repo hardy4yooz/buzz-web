@@ -118,18 +118,32 @@ behavior.
 
 ### Workflow authoring and runs
 
-**Target:** add workflow lists, editing, triggers, run/step detail, schedules, and webhooks. Existing
-Inbox approval handling remains the first supported action surface.
+**Read-only run history (implemented).** Members can open Workflows, list the `kind:30620`
+definitions in their readable channels, and read a selected definition's run rows. The list is
+fetched on demand from `GET /workflows/{id}/runs`; the Relay publishes no workflow execution events,
+so run state is not real-time. The client neither reads nor shows approvals: `approval_ref` is a
+bearer capability, approval gates are unimplemented upstream (WF-08), and a run that requests one
+fails instead of waiting.
+
+**Target:** add workflow editing, triggers, deeper run/step detail, schedules, and webhooks.
 
 **Acceptance criteria:**
 
 - The editor validates definitions before publishing.
-- Run state updates in real time and can be traced to the initiating event.
-- Webhook secrets are never returned to or persisted by the browser.
+- Run history is read on demand; live run state remains upstream work because the Relay publishes no
+  workflow events.
+- The browser never reads, renders, or stores approval capabilities or webhook secrets.
 
 ## P3: Platform Capabilities
 
-Planned research areas include multi-community switching, Web Push notifications, Pulse,
+**Open-tab notifications (implemented).** Settings → Notifications lets each device opt in to
+desktop notifications for mentions, direct messages, thread replies, and pending approvals while
+Buzz Web is open. Delivery is foreground or hidden-tab only: it notifies from the live inbox, uses
+the community name and one fixed body string (never a sender, channel name, or message text), and
+makes no exactly-once promise. Closed-tab and offline Web Push remain unimplemented because the
+Relay has no APNs-style push path; that stays a platform research item.
+
+Planned research areas include multi-community switching, closed-tab Web Push, Pulse,
 WebRTC-based Huddles, and a controlled remote terminal. These features need browser-native security
 designs and cannot copy Tauri APIs directly.
 

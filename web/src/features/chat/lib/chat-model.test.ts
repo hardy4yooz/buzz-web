@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   buildMessageTags,
   buildTimeline,
@@ -6,10 +6,14 @@ import {
   contentWithAttachments,
   describeSystemMessage,
   fallbackProfile,
+  isValidProfilePicture,
   mergeProfileMetadata,
+  mergeProfiles,
   messageRecipientPubkeys,
   parseCommunityRole,
   parseSystemMessagePayload,
+  profileDisplayName,
+  profilesFromEvents,
   resolveMentionPubkeys,
   systemMessagePubkeys,
 } from "@/features/chat/lib/chat-model";
@@ -38,6 +42,16 @@ function event(
     sig: "aa".repeat(64),
   };
 }
+
+describe("profile picture validation", () => {
+  it("accepts empty and HTTP(S) URLs, rejects malformed and other protocols", () => {
+    expect(isValidProfilePicture("")).toBe(true);
+    expect(isValidProfilePicture(" https://example.com/avatar.png ")).toBe(true);
+    expect(isValidProfilePicture("http://example.com/avatar.png")).toBe(true);
+    expect(isValidProfilePicture("not-a-url")).toBe(false);
+    expect(isValidProfilePicture("ftp://example.com/avatar.png")).toBe(false);
+  });
+});
 
 describe("Buzz channel model", () => {
   it("parses NIP-29 channel metadata and member roles", () => {
@@ -246,6 +260,100 @@ describe("Buzz profile metadata", () => {
     expect(
       JSON.parse(mergeProfileMetadata("not-json", { name: "Alex", about: "", picture: "" })),
     ).toEqual({ display_name: "Alex", name: "Alex", about: "", picture: "" });
+  });
+});
+
+describe("Buzz profile hydration", () => {
+  const agents = new Set([AGENT]);
+
+  it("uses the first non-blank name field instead of letting an empty one mask it", () => {
+    const profiles = profilesFromEvents(
+      [
+        event(
+          "a",
+          0,
+          AGENT,
+          JSON.stringify({ display_name: "  ", displayName: null, name: "Codex(remote)" }),
+          [],
+          5,
+        ),
+      ],
+      agents,
+    );
+
+    expect(profiles[AGENT]).toMatchObject({
+      pubkey: AGENT,
+      name: "Codex(remote)",
+      isAgent: true,
+    });
+  });
+
+  it("keeps the latest metadata and tolerates null, array, and malformed content", () => {
+    const profiles = profilesFromEvents(
+      [
+        event("b", 0, SELF, JSON.stringify({ name: "Old name" }), [], 10),
+        event("c", 0, SELF, JSON.stringify({ name: "New name" }), [], 11),
+        event("d", 0, RELAY, "null", [], 20),
+        event("e", 0, "44".repeat(32), "[]", [], 21),
+        event("f", 0, "55".repeat(32), "not-json", [], 22),
+        event("9", 0, "66".repeat(32), JSON.stringify({ name: "" }), [], 23),
+      ],
+      new Set(),
+    );
+
+    expect(profiles[SELF].name).toBe("New name");
+    for (const pubkey of [RELAY, "44".repeat(32), "55".repeat(32), "66".repeat(32)]) {
+      expect(profiles[pubkey]).toMatchObject({ name: "", about: "", picture: null });
+    }
+  });
+
+  it("preserves known names and applies real names from newer metadata", () => {
+    const current = {
+      [SELF]: { ...fallbackProfile(SELF), name: "Alice", about: "old about" },
+      [AGENT]: fallbackProfile(AGENT, "Codex(remote)", true),
+    };
+    const incoming = profilesFromEvents(
+      [
+        event("1", 0, SELF, JSON.stringify({ display_name: "", name: "" }), [], 30),
+        event("2", 0, AGENT, JSON.stringify({ name: "Codex v2" }), [], 31),
+        event("3", 0, RELAY, JSON.stringify({ display_name: "Bob" }), [], 32),
+      ],
+      agents,
+    );
+    const merged = mergeProfiles(current, incoming);
+
+    expect(merged[SELF].name).toBe("Alice");
+    expect(merged[AGENT]).toMatchObject({ name: "Codex v2", isAgent: true });
+    expect(merged[RELAY]).toMatchObject({ name: "Bob", isAgent: false });
+  });
+
+  it("labels nameless authors locally instead of presenting a fabricated public name", () => {
+    vi.stubGlobal("navigator", { languages: ["en"] });
+    try {
+      const merged = mergeProfiles(
+        {},
+        profilesFromEvents([event("4", 0, SELF, "null", [], 1)], new Set()),
+      );
+
+      expect(merged[SELF].name).toBe(fallbackProfile(SELF).name);
+      expect(merged[SELF].name.startsWith("Member ")).toBe(true);
+      expect(profileDisplayName({ ...fallbackProfile(SELF), name: "Alice" }, SELF)).toBe("Alice");
+      expect(profileDisplayName(undefined, AGENT, true)).toBe(
+        fallbackProfile(AGENT, undefined, true).name,
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("localizes the local nameless placeholder", () => {
+    vi.stubGlobal("navigator", { languages: ["zh-CN"] });
+    try {
+      expect(fallbackProfile(SELF).name.startsWith("成员 ")).toBe(true);
+      expect(profileDisplayName(undefined, AGENT, true).startsWith("Agent ")).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

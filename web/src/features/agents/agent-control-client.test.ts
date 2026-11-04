@@ -45,4 +45,29 @@ describe("startRelayAgent", () => {
       vi.unstubAllGlobals();
     }
   });
+
+  it("waits out the server's worst-case start sequence", async () => {
+    activateLocalSigner(generateSecretKey());
+    const timeoutSpy = vi.spyOn(AbortSignal, "timeout");
+    const fetchMock = vi.fn(
+      async (_input: string | URL | Request, _init?: RequestInit) =>
+        new Response(JSON.stringify({ status: "accepted" }), {
+          status: 202,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    try {
+      await startRelayAgent("https://buzz.example.com/app/api/agent-control", "b".repeat(64));
+      const request = fetchMock.mock.calls[0]?.[1];
+      // Server worst case is 5s is-active + 15s start + 5s is-active before it responds.
+      expect(timeoutSpy).toHaveBeenCalledWith(35_000);
+      expect(request?.signal).toBe(timeoutSpy.mock.results[0]?.value);
+    } finally {
+      timeoutSpy.mockRestore();
+      clearActiveSigner();
+      vi.unstubAllGlobals();
+    }
+  });
 });

@@ -28,6 +28,30 @@ export default defineConfig({
         ...devices["Desktop Chrome"],
       },
     },
+    {
+      name: "moderation",
+      testMatch: ["**/moderation.spec.ts"],
+      use: {
+        ...devices["Desktop Chrome"],
+      },
+    },
+    {
+      name: "workflows",
+      testMatch: ["**/workflows.spec.ts"],
+      use: {
+        ...devices["Desktop Chrome"],
+      },
+    },
+    {
+      name: "notifications",
+      testMatch: ["**/notifications.spec.ts"],
+      use: {
+        ...devices["Desktop Chrome"],
+        // The bundled headless shell reports Notification.permission as denied; the full Chromium
+        // build in new headless mode reports and stores notifications like a normal browser.
+        channel: "chromium",
+      },
+    },
   ],
   webServer: {
     command: "npx vite preview --port 4187 --strictPort --host 127.0.0.1",

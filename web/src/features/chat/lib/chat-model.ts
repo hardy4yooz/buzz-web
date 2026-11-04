@@ -91,7 +91,7 @@ function systemIdentityLabel(
 ): string {
   if (!pubkey) return t("system.system");
   if (pubkey === currentPubkey.toLowerCase()) return t("system.you");
-  return profiles[pubkey]?.name || truncatePubkey(pubkey);
+  return profiles[pubkey]?.name || fallbackProfile(pubkey).name;
 }
 
 /** Match Desktop's human-readable treatment of kind:40099 system rows. */
@@ -240,15 +240,49 @@ export function parseCommunityRole(
 }
 
 export function fallbackProfile(pubkey: string, name?: string, isAgent = false): UserProfile {
+  const normalized = pubkey.toLowerCase();
+  const label = isAgent ? t("common.agent") : t("common.member");
   return {
-    pubkey: pubkey.toLowerCase(),
-    name: name || truncatePubkey(pubkey),
+    pubkey: normalized,
+    name: name?.trim() || `${label} ${truncatePubkey(normalized)}`,
     about: "",
     picture: null,
     isAgent,
   };
 }
 
+/** One place for the local placeholder shown when an author has no public name. */
+export function profileDisplayName(
+  profile: UserProfile | undefined,
+  pubkey: string,
+  isAgent = profile?.isAgent ?? false,
+): string {
+  return profile?.name.trim() || fallbackProfile(pubkey, undefined, isAgent).name;
+}
+
+function metadataObject(content: string): Record<string, unknown> {
+  try {
+    const parsed: unknown = JSON.parse(content);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+export function metadataDisplayName(metadata: Record<string, unknown>): string | undefined {
+  for (const key of ["display_name", "displayName", "name"] as const) {
+    const value = metadata[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+/**
+ * Latest kind-0 metadata per author. `name` stays empty when the latest metadata
+ * has no usable name so callers can keep configured or already known names.
+ */
 export function profilesFromEvents(
   events: NostrEvent[],
   agentPubkeys: ReadonlySet<string>,
@@ -260,23 +294,46 @@ export function profilesFromEvents(
   }
   const profiles: Record<string, UserProfile> = {};
   for (const [pubkey, event] of latest) {
-    let metadata: Record<string, unknown> = {};
-    try {
-      metadata = JSON.parse(event.content) as Record<string, unknown>;
-    } catch {
-      metadata = {};
-    }
+    const metadata = metadataObject(event.content);
     const profile = fallbackProfile(pubkey, undefined, agentPubkeys.has(pubkey));
-    const displayName = metadata.display_name ?? metadata.displayName ?? metadata.name;
     profiles[pubkey] = {
       ...profile,
-      name:
-        typeof displayName === "string" && displayName.trim() ? displayName.trim() : profile.name,
+      name: metadataDisplayName(metadata) ?? "",
       about: typeof metadata.about === "string" ? metadata.about : "",
       picture: typeof metadata.picture === "string" && metadata.picture ? metadata.picture : null,
     };
   }
   return profiles;
+}
+
+/** Merge fetched metadata without replacing a known name with a local placeholder. */
+export function mergeProfiles(
+  current: Record<string, UserProfile>,
+  incoming: Record<string, UserProfile>,
+): Record<string, UserProfile> {
+  const next = { ...current };
+  for (const [pubkey, update] of Object.entries(incoming)) {
+    const existing = next[pubkey];
+    const base = existing ?? fallbackProfile(pubkey, undefined, update.isAgent);
+    next[pubkey] = {
+      ...base,
+      ...update,
+      name: update.name || base.name,
+      isAgent: base.isAgent || update.isAgent,
+    };
+  }
+  return next;
+}
+
+export function isValidProfilePicture(picture: string): boolean {
+  const value = picture.trim();
+  if (!value) return true;
+  try {
+    const protocol = new URL(value).protocol;
+    return protocol === "http:" || protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 export function mergeProfileMetadata(

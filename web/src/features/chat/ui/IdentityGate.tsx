@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Eye,
@@ -48,6 +49,7 @@ export function IdentityGate({
   const [pubkey, setPubkey] = useState<string | null>(() =>
     config.demoMode ? "f".repeat(64) : getActiveSignerPubkey(),
   );
+  const queryClient = useQueryClient();
   const [vaults, setVaults] = useState<VaultMetadata[]>([]);
   const [selectedPubkey, setSelectedPubkey] = useState<string | null>(null);
   const [checkingVault, setCheckingVault] = useState(!config.demoMode);
@@ -88,6 +90,7 @@ export function IdentityGate({
       pubkey,
       demo: config.demoMode,
       signOut: () => {
+        queryClient.clear();
         clearActiveSigner();
         setPubkey(null);
         setPassphrase("");

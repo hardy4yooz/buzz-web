@@ -28,8 +28,10 @@ export async function makeNip98AuthHeader(
   ];
   if (options?.body !== undefined) {
     tags.push(["payload", await sha256Hex(options.body)]);
-    tags.push(["nonce", crypto.randomUUID()]);
   }
+  // A fresh nonce per request keeps signatures distinct; two identical bodyless GETs would
+  // otherwise produce the same signed event.
+  tags.push(["nonce", crypto.randomUUID()]);
   const event = await signNostrEvent(
     {
       kind: 27235,

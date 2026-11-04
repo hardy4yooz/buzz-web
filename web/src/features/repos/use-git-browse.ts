@@ -5,8 +5,9 @@
  * into IndexedDB before any reads happen.
  */
 
-import { useQuery } from "@tanstack/react-query";
+import { type UseQueryResult, useQuery } from "@tanstack/react-query";
 import { resolveRef } from "isomorphic-git";
+import { getActiveSignerPubkey } from "@/shared/lib/nostr-signer";
 import {
   ensureClone,
   findReadme,
@@ -16,16 +17,49 @@ import {
   resolveHtmlAssets,
 } from "./git-client";
 
+type CloneData = Awaited<ReturnType<typeof ensureClone>>;
+
+/**
+ * The public shape every derived browse hook exposes.
+ *
+ * A clone-query rejection (initial denial or a denied background refetch)
+ * must mask every derived result, including bytes React Query still retains
+ * from an earlier success. Only the clone query's error remains visible.
+ */
+export interface GitBrowseResult<T> {
+  data: T | undefined;
+  error: Error | null;
+  isLoading: boolean;
+  isFetching: boolean;
+}
+
+function browseResult<T>(
+  query: UseQueryResult<T>,
+  cloneQuery: UseQueryResult<CloneData>,
+): GitBrowseResult<T> {
+  if (cloneQuery.isError) {
+    return { data: undefined, error: cloneQuery.error, isLoading: false, isFetching: false };
+  }
+  return {
+    data: query.data,
+    error: query.error,
+    isLoading: query.isLoading,
+    isFetching: query.isFetching,
+  };
+}
+
 /**
  * Ensure the repo is cloned (or fetched) into IndexedDB.
  * Other hooks depend on this to get `fs` and `dir`.
  */
 export function useGitClone(relayUrl: string, owner: string, repoName: string, ref: string) {
+  const viewer = getActiveSignerPubkey();
+
   return useQuery({
-    queryKey: ["git-clone", relayUrl, owner, repoName, ref],
-    queryFn: () => ensureClone(relayUrl, owner, repoName, ref),
+    queryKey: ["git-clone", relayUrl, viewer ?? "", owner, repoName, ref],
+    queryFn: () => ensureClone(relayUrl, viewer ?? "", owner, repoName, ref),
     staleTime: 5 * 60_000,
-    enabled: !!owner && !!repoName && !!ref,
+    enabled: !!viewer && !!owner && !!repoName && !!ref,
     retry: false,
   });
 }
@@ -38,10 +72,11 @@ export function useGitTree(
   ref: string,
   path?: string,
 ) {
+  const viewer = getActiveSignerPubkey();
   const cloneQuery = useGitClone(relayUrl, owner, repoName, ref);
 
-  return useQuery({
-    queryKey: ["git-tree", relayUrl, owner, repoName, ref, path ?? ""],
+  const query = useQuery({
+    queryKey: ["git-tree", relayUrl, viewer ?? "", owner, repoName, ref, path ?? ""],
     queryFn: async () => {
       if (!cloneQuery.data) throw new Error("unreachable: enabled guards data");
       const { fs, dir } = cloneQuery.data;
@@ -58,14 +93,16 @@ export function useGitTree(
     enabled: !!cloneQuery.data,
     staleTime: 5 * 60_000,
   });
+  return browseResult(query, cloneQuery);
 }
 
 /** Get recent commits for the given ref. */
 export function useGitLog(relayUrl: string, owner: string, repoName: string, ref: string) {
+  const viewer = getActiveSignerPubkey();
   const cloneQuery = useGitClone(relayUrl, owner, repoName, ref);
 
-  return useQuery({
-    queryKey: ["git-log", relayUrl, owner, repoName, ref],
+  const query = useQuery({
+    queryKey: ["git-log", relayUrl, viewer ?? "", owner, repoName, ref],
     queryFn: async () => {
       if (!cloneQuery.data) throw new Error("unreachable: enabled guards data");
       const { fs, dir } = cloneQuery.data;
@@ -74,14 +111,16 @@ export function useGitLog(relayUrl: string, owner: string, repoName: string, ref
     enabled: !!cloneQuery.data,
     staleTime: 5 * 60_000,
   });
+  return browseResult(query, cloneQuery);
 }
 
 /** Find and read the README from the repo root. */
 export function useGitReadme(relayUrl: string, owner: string, repoName: string, ref: string) {
+  const viewer = getActiveSignerPubkey();
   const cloneQuery = useGitClone(relayUrl, owner, repoName, ref);
 
-  return useQuery({
-    queryKey: ["git-readme", relayUrl, owner, repoName, ref],
+  const query = useQuery({
+    queryKey: ["git-readme", relayUrl, viewer ?? "", owner, repoName, ref],
     queryFn: async () => {
       if (!cloneQuery.data) throw new Error("unreachable: enabled guards data");
       const { fs, dir } = cloneQuery.data;
@@ -90,6 +129,7 @@ export function useGitReadme(relayUrl: string, owner: string, repoName: string, 
     enabled: !!cloneQuery.data,
     staleTime: 5 * 60_000,
   });
+  return browseResult(query, cloneQuery);
 }
 
 /** Read a single file's content as a classified `BlobView`. */
@@ -100,10 +140,11 @@ export function useGitBlob(
   ref: string,
   filepath: string,
 ) {
+  const viewer = getActiveSignerPubkey();
   const cloneQuery = useGitClone(relayUrl, owner, repoName, ref);
 
-  return useQuery({
-    queryKey: ["git-blob", relayUrl, owner, repoName, ref, filepath],
+  const query = useQuery({
+    queryKey: ["git-blob", relayUrl, viewer ?? "", owner, repoName, ref, filepath],
     queryFn: async () => {
       if (!cloneQuery.data) throw new Error("unreachable: enabled guards data");
       const { fs, dir } = cloneQuery.data;
@@ -113,6 +154,7 @@ export function useGitBlob(
     enabled: !!cloneQuery.data && !!filepath,
     staleTime: 5 * 60_000,
   });
+  return browseResult(query, cloneQuery);
 }
 
 /**
@@ -130,10 +172,11 @@ export function useGitHtmlDoc(
   html: string,
   enabled: boolean,
 ) {
+  const viewer = getActiveSignerPubkey();
   const cloneQuery = useGitClone(relayUrl, owner, repoName, ref);
 
-  return useQuery({
-    queryKey: ["git-html-doc", relayUrl, owner, repoName, ref, filepath],
+  const query = useQuery({
+    queryKey: ["git-html-doc", relayUrl, viewer ?? "", owner, repoName, ref, filepath],
     queryFn: async () => {
       if (!cloneQuery.data) throw new Error("unreachable: enabled guards data");
       const { fs, dir } = cloneQuery.data;
@@ -143,4 +186,5 @@ export function useGitHtmlDoc(
     enabled: enabled && !!cloneQuery.data && !!filepath,
     staleTime: 5 * 60_000,
   });
+  return browseResult(query, cloneQuery);
 }

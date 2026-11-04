@@ -1,8 +1,8 @@
 import { Compass, Hash, LoaderCircle, MessageCircle, Plus, Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { profileDisplayName } from "@/features/chat/lib/chat-model";
 import type { BuzzChannel, SearchHit, UserProfile } from "@/features/chat/lib/chat-types";
 import { t } from "@/shared/i18n";
-import { truncatePubkey } from "@/shared/lib/pubkey";
 
 export function DialogFrame({
   title,
@@ -159,6 +159,7 @@ export function CreateChannelForm({
 export function SearchDialog({
   channels,
   profiles,
+  connected,
   onClose,
   onSearch,
   onSelect,
@@ -170,6 +171,7 @@ export function SearchDialog({
 }: {
   channels: BuzzChannel[];
   profiles: Record<string, UserProfile>;
+  connected: boolean;
   onClose: () => void;
   onSearch: (term: string, channelId?: string) => Promise<SearchHit[]>;
   onSelect: (hit: SearchHit) => void;
@@ -191,6 +193,12 @@ export function SearchDialog({
     let active = true;
     setError(null);
     setLoading(false);
+    if (!connected) {
+      setResults([]);
+      return () => {
+        active = false;
+      };
+    }
     if (term.trim().length < 2) {
       setResults([]);
       return () => {
@@ -218,7 +226,7 @@ export function SearchDialog({
       active = false;
       window.clearTimeout(timer);
     };
-  }, [onSearch, scopeChannel?.id, term]);
+  }, [connected, onSearch, scopeChannel?.id, term]);
   const title = scopeChannel
     ? t("dialog.searchChannel", { channel: scopeChannel.name })
     : t("dialog.searchMessages");
@@ -320,18 +328,23 @@ export function SearchDialog({
             >
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Hash className="h-3 w-3" /> {channel?.name ?? t("common.channel")} ·{" "}
-                {profile?.name ?? truncatePubkey(hit.event.pubkey)}
+                {profileDisplayName(profile, hit.event.pubkey)}
               </div>
               <p className="mt-1 line-clamp-2 text-sm leading-5">{hit.event.content}</p>
             </button>
           );
         })}
+        {!connected && term.trim().length >= 2 ? (
+          <p className="px-3 py-10 text-center text-sm text-muted-foreground" role="status">
+            {t("error.relayUnavailable")}
+          </p>
+        ) : null}
         {error ? (
           <p className="px-3 py-10 text-center text-sm text-destructive" role="alert">
             {error}
           </p>
         ) : null}
-        {term.trim().length >= 2 && !loading && !error && !results.length ? (
+        {connected && term.trim().length >= 2 && !loading && !error && !results.length ? (
           <p className="px-3 py-10 text-center text-sm text-muted-foreground">
             {t("dialog.noMessages")}
           </p>

@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { fallbackProfile } from "@/features/chat/lib/chat-model";
 import type { BuzzChannel, UserProfile } from "@/features/chat/lib/chat-types";
 import { Avatar } from "@/features/chat/ui/Avatar";
 import { MessageContent } from "@/features/chat/ui/MessageContent";
@@ -19,7 +20,6 @@ import type { InboxCategory, InboxItem } from "@/features/inbox/lib/inbox-model"
 import { inboxPreview } from "@/features/inbox/lib/inbox-model";
 import { InboxListResizeHandle, useInboxListWidth } from "@/features/inbox/ui/InboxPanelSizing";
 import { getLocale, t } from "@/shared/i18n";
-import { truncatePubkey } from "@/shared/lib/pubkey";
 
 type InboxFilter = "all" | InboxCategory;
 
@@ -48,21 +48,12 @@ function eventTime(createdAt: number): string {
   }).format(createdAt * 1_000);
 }
 
-function fallbackProfile(item: InboxItem): UserProfile {
-  return {
-    pubkey: item.event.pubkey,
-    name: truncatePubkey(item.event.pubkey),
-    about: "",
-    picture: null,
-    isAgent: false,
-  };
-}
-
 export function InboxView({
   items,
   channels,
   profiles,
   relayUrl,
+  connected,
   loading,
   error,
   approvalPending,
@@ -78,6 +69,7 @@ export function InboxView({
   channels: readonly BuzzChannel[];
   profiles: Readonly<Record<string, UserProfile>>;
   relayUrl: string;
+  connected: boolean;
   loading: boolean;
   error: string | null;
   approvalPending: string | null;
@@ -109,7 +101,7 @@ export function InboxView({
     : (visibleItems[0] ?? null);
   const unreadCount = items.filter((item) => item.unread).length;
   const selectedProfile = selected
-    ? (profiles[selected.event.pubkey.toLowerCase()] ?? fallbackProfile(selected))
+    ? (profiles[selected.event.pubkey.toLowerCase()] ?? fallbackProfile(selected.event.pubkey))
     : null;
   const selectedChannel = selected?.channelId
     ? channels.find((channel) => channel.id === selected.channelId)
@@ -226,7 +218,8 @@ export function InboxView({
 
         <div className="buzz-scrollbar min-h-0 flex-1 overflow-y-auto">
           {visibleItems.map((item) => {
-            const profile = profiles[item.event.pubkey.toLowerCase()] ?? fallbackProfile(item);
+            const profile =
+              profiles[item.event.pubkey.toLowerCase()] ?? fallbackProfile(item.event.pubkey);
             const channel = item.channelId
               ? channels.find((candidate) => candidate.id === item.channelId)
               : null;
@@ -280,7 +273,9 @@ export function InboxView({
           {!loading && !visibleItems.length ? (
             <div className="px-5 py-14 text-center">
               <Mail className="mx-auto h-8 w-8 text-muted-foreground/50" />
-              <p className="mt-3 text-sm text-muted-foreground">{t("inbox.empty")}</p>
+              <p className="mt-3 text-sm text-muted-foreground">
+                {connected ? t("inbox.empty") : t("error.relayUnavailable")}
+              </p>
             </div>
           ) : null}
           {loading && !visibleItems.length ? (
@@ -353,7 +348,7 @@ export function InboxView({
               <div className="mx-auto max-w-[900px]">
                 {relatedItems.map((item, index) => {
                   const profile =
-                    profiles[item.event.pubkey.toLowerCase()] ?? fallbackProfile(item);
+                    profiles[item.event.pubkey.toLowerCase()] ?? fallbackProfile(item.event.pubkey);
                   return (
                     <article key={item.id} className={index ? "mt-5 border-t pt-5" : undefined}>
                       <div className="flex items-start gap-3">
@@ -430,7 +425,9 @@ export function InboxView({
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center px-6 text-center text-muted-foreground">
             <Mail className="h-9 w-9 opacity-45" />
-            <p className="mt-3 text-sm">{t("inbox.empty")}</p>
+            <p className="mt-3 text-sm">
+              {connected ? t("inbox.empty") : t("error.relayUnavailable")}
+            </p>
           </div>
         )}
       </section>

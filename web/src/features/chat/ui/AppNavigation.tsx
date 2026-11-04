@@ -12,9 +12,11 @@ import {
   Plus,
   Search,
   Settings,
+  ShieldCheck,
   Star,
   UserRoundCog,
   UserRoundPlus,
+  Workflow,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -77,8 +79,10 @@ export function AppNavigation({
   mobileOpen,
   canCreateChannel,
   canManageMembers,
+  canModerate,
   activeTool,
   inboxUnreadCount,
+  showWorkflows,
   channelUnreadCounts,
   starredChannelIds,
   mutedChannelIds,
@@ -108,8 +112,10 @@ export function AppNavigation({
   mobileOpen: boolean;
   canCreateChannel: boolean;
   canManageMembers: boolean;
+  canModerate: boolean;
   activeTool: WorkspaceTool | null;
   inboxUnreadCount: number;
+  showWorkflows: boolean;
   channelUnreadCounts: Readonly<Record<string, number>>;
   features: RelayFeatureState;
   maximumWidth: number;
@@ -130,6 +136,7 @@ export function AppNavigation({
 }) {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
+  const mobileCloseRef = useRef<HTMLButtonElement>(null);
   const profile = profiles[currentPubkey] ?? {
     pubkey: currentPubkey,
     name: t("system.you"),
@@ -150,6 +157,10 @@ export function AppNavigation({
     onSelectChannel(id);
     onCloseMobile();
   };
+
+  useEffect(() => {
+    if (mobileOpen) mobileCloseRef.current?.focus();
+  }, [mobileOpen]);
 
   useEffect(() => {
     if (!profileMenuOpen) return;
@@ -222,6 +233,7 @@ export function AppNavigation({
             <kbd className="shrink-0 text-[10px] opacity-65">⌘K</kbd>
           </button>
           <button
+            ref={mobileCloseRef}
             aria-label={t("common.close")}
             className="buzz-icon-button md:!hidden"
             type="button"
@@ -261,6 +273,30 @@ export function AppNavigation({
               >
                 <GitBranch className="h-[17px] w-[17px] shrink-0" />
                 <span>{t("nav.projects")}</span>
+              </button>
+            ) : null}
+            {showWorkflows ? (
+              <button
+                aria-label={t("nav.workflows")}
+                aria-pressed={activeTool === "workflows"}
+                className={navRow(activeTool === "workflows")}
+                type="button"
+                onClick={() => onToggleTool("workflows")}
+              >
+                <Workflow className="h-[17px] w-[17px] shrink-0" />
+                <span>{t("nav.workflows")}</span>
+              </button>
+            ) : null}
+            {canModerate ? (
+              <button
+                aria-label={t("nav.moderation")}
+                aria-pressed={activeTool === "moderation"}
+                className={navRow(activeTool === "moderation")}
+                type="button"
+                onClick={() => onToggleTool("moderation")}
+              >
+                <ShieldCheck className="h-[17px] w-[17px] shrink-0" />
+                <span>{t("nav.moderation")}</span>
               </button>
             ) : null}
             <button

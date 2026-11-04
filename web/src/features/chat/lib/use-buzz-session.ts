@@ -8,6 +8,7 @@ import {
   AUXILIARY_KINDS,
   buildTimeline,
   fallbackProfile,
+  mergeProfiles,
   parseCommunityRole,
   profilesFromEvents,
   systemMessagePubkeys,
@@ -86,18 +87,23 @@ export function useBuzzSession({
         /^[0-9a-f]{64}$/.test(value),
       );
       if (!unique.length) return;
-      const events = await client.query({ kinds: [0], authors: unique, limit: unique.length });
+      let events: NostrEvent[];
+      try {
+        events = await client.query({ kinds: [0], authors: unique });
+      } catch {
+        return;
+      }
       const parsed = profilesFromEvents(events, agentPubkeys);
       setProfiles((current) => {
-        const next = { ...current, ...parsed };
+        const next = mergeProfiles(current, parsed);
         for (const candidate of unique) {
-          next[candidate] ??= fallbackProfile(candidate);
+          next[candidate] ??= fallbackProfile(candidate, undefined, agentPubkeys.has(candidate));
         }
         for (const agent of config.agents) {
           const existing = next[agent.pubkey] ?? fallbackProfile(agent.pubkey, agent.name, true);
           next[agent.pubkey] = {
             ...existing,
-            name: parsed[agent.pubkey]?.name || agent.name,
+            name: parsed[agent.pubkey]?.name || existing.name,
             isAgent: true,
           };
         }
@@ -157,6 +163,22 @@ export function useBuzzSession({
       const nextChannels = nextDiscovered.filter(
         (channel) => channel.isMember && !channel.archived,
       );
+      const profilePubkeys = [
+        pubkey,
+        ...config.agents.map((agent) => agent.pubkey),
+        ...nextDiscovered.flatMap((channel) => channel.members.map((member) => member.pubkey)),
+      ];
+      void loadProfiles(profilePubkeys);
+      void client
+        .queryHttp([
+          {
+            kinds: [40902],
+            authors: [...new Set(profilePubkeys.map((value) => value.toLowerCase()))],
+            limit: profilePubkeys.length,
+          },
+        ])
+        .then((events) => applyPresenceEvents(events, profilePubkeys))
+        .catch(() => undefined);
       setDiscoveredChannels(nextDiscovered);
       setChannels(nextChannels);
       setSelectedChannelId((current) =>
@@ -167,24 +189,6 @@ export function useBuzzSession({
             null),
       );
       setCommunityRole(parseCommunityRole(roleEvents[0], pubkey));
-      const profilePubkeys = [
-        pubkey,
-        ...config.agents.map((agent) => agent.pubkey),
-        ...nextDiscovered.flatMap((channel) => channel.members.map((member) => member.pubkey)),
-      ];
-      await Promise.all([
-        loadProfiles(profilePubkeys),
-        client
-          .queryHttp([
-            {
-              kinds: [40902],
-              authors: [...new Set(profilePubkeys.map((value) => value.toLowerCase()))],
-              limit: profilePubkeys.length,
-            },
-          ])
-          .then((events) => applyPresenceEvents(events, profilePubkeys))
-          .catch(() => undefined),
-      ]);
       const botPubkeys = new Set(
         nextChannels.flatMap((channel) =>
           channel.members.filter((member) => member.role === "bot").map((member) => member.pubkey),
@@ -436,12 +440,17 @@ export function useBuzzSession({
           (event) => anchorIds.includes(event.id) && eventChannelId(event) === selectedChannelId,
         );
         const nextContentEvents = mergeEvents(history, anchoredHistory);
-        setContentEvents(nextContentEvents);
         const members = memberEvents[0]
           ? memberEvents[0].tags.filter((tag) => tag[0] === "p").map((tag) => tag[1])
           : [];
-        await loadProfiles([...members, ...nextContentEvents.flatMap(systemMessagePubkeys)]);
-        unsubscribeChannel = await client.subscribe(
+        setContentEvents(nextContentEvents);
+        void loadProfiles([
+          ...members,
+          ...nextContentEvents.map((event) => event.pubkey),
+          ...nextContentEvents.flatMap(systemMessagePubkeys),
+        ]);
+        if (cancelled) return;
+        const stopChannel = await client.subscribe(
           {
             kinds: [...TIMELINE_KINDS, ...AUXILIARY_KINDS],
             "#h": [selectedChannelId],
@@ -450,7 +459,9 @@ export function useBuzzSession({
           (event) => {
             if (TIMELINE_KINDS.includes(event.kind)) {
               setContentEvents((current) => mergeEvents(current, [event]));
-              if (event.kind === 40099) void loadProfiles(systemMessagePubkeys(event));
+              void loadProfiles(
+                event.kind === 40099 ? systemMessagePubkeys(event) : [event.pubkey],
+              );
               setDelivery((current) => {
                 if (!(event.id in current)) return current;
                 const next = { ...current };
@@ -462,7 +473,12 @@ export function useBuzzSession({
             }
           },
         );
-        unsubscribeTyping = await client.subscribe(
+        if (cancelled) {
+          stopChannel();
+          return;
+        }
+        unsubscribeChannel = stopChannel;
+        const stopTyping = await client.subscribe(
           { kinds: [20002], "#h": [selectedChannelId], since: startedAt, limit: 0 },
           (event) => {
             if (event.pubkey.toLowerCase() === pubkey.toLowerCase()) return;
@@ -472,6 +488,11 @@ export function useBuzzSession({
             }));
           },
         );
+        if (cancelled) {
+          stopTyping();
+          return;
+        }
+        unsubscribeTyping = stopTyping;
       })
       .catch((loadError) => {
         if (!cancelled)
